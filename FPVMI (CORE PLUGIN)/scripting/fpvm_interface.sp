@@ -2,7 +2,7 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define DATA "1.0.1"
+#define DATA "1.1"
 
 Handle array_weapons[MAXPLAYERS+1];
 
@@ -62,7 +62,16 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	
 	if(!GetTrieValue(array_weapons[client], classname, model_index)) return;
 	
-	if(model_index == -1) return;
+	Format(classname, sizeof(classname), "%s_default", classname);
+	
+	if(model_index == -1)
+	{
+		if(!GetTrieValue(array_weapons[client], classname, model_index) || model_index == -1) return;
+		
+		SetEntProp(g_PVMid[client], Prop_Send, "m_nModelIndex", model_index); 
+		SetTrieValue(array_weapons[client], classname, -1);
+		return;
+	}
 	
 	if(eco_items)
 	{
@@ -75,7 +84,11 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 /*  	int iWorldModel = GetEntPropEnt(wpnid, Prop_Send, "m_hWeaponWorldModel"); 
 	if(IsValidEdict(iWorldModel)) SetEntProp(iWorldModel, Prop_Send, "m_nModelIndex", 0);  */ 
 	
-	SetEntProp(g_PVMid[client], Prop_Send, "m_nModelIndex", model_index); 
+	int model_index_custom = model_index;
+	
+	if(!GetTrieValue(array_weapons[client], classname, model_index) || model_index == -1) SetTrieValue(array_weapons[client], classname, GetEntProp(g_PVMid[client], Prop_Send, "m_nModelIndex"));
+	
+	SetEntProp(g_PVMid[client], Prop_Send, "m_nModelIndex", model_index_custom); 
 }
 
 public void OnClientDisconnect(int client)

@@ -5,7 +5,7 @@
 #undef REQUIRE_EXTENSIONS
 #include <dhooks>
 
-#define DATA "1.2.2"
+#define DATA "1.3"
 
 Handle array_weapons[MAXPLAYERS+1];
 
@@ -15,6 +15,10 @@ int g_PVMid[MAXPLAYERS+1];
 
 Handle hGiveNamedItem, hGiveNamedItem2;
 bool nosir[MAXPLAYERS+1];
+
+new OldWeapon[MAXPLAYERS + 1];
+new OldSequence[MAXPLAYERS + 1];
+new Float:OldCycle[MAXPLAYERS + 1];
 
 public Plugin myinfo = 
 {
@@ -44,6 +48,7 @@ public void OnPluginStart()
 	CreateConVar("sm_fpvmi_version", DATA, "", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
 	
 	HookEvent("player_spawn", OnSpawn);
+	//HookEvent("weapon_fire", EventWeaponFire);
 	
 	if(!eco_items) return;
 	
@@ -64,6 +69,65 @@ public void OnPluginStart()
 	DHookAddParam(hGiveNamedItem, HookParamType_Bool);
 	
 	hGiveNamedItem2 = DHookCreate(iOffset, HookType_Entity, ReturnType_CBaseEntity, ThisPointer_CBaseEntity, OnGiveNamedItemPre);
+}
+
+/* public Action:EventWeaponFire(Handle:event, const String:name[], bool:dontBroadcast)
+{
+    // Get all required event info.
+	new client = GetClientOfUserId(GetEventInt(event, "userid"));
+	new model_index;
+	char classname[64];
+	if(!GetEdictClassname(GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon"), classname, 64)) return;
+	
+	if(!GetTrieValue(array_weapons[client], classname, model_index) || model_index == -1) return;
+	
+	SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 0);
+	
+	PrintToChat(client, "hecho");
+} */
+
+public OnPostThinkPost(client)
+{
+	if (!IsPlayerAlive(client))
+	{
+        return;
+	}
+	
+	new model_index;
+	char ClassName[64];
+	new WeaponIndex = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+	
+	if(!GetEdictClassname(WeaponIndex, ClassName, 64)) return;
+	
+	if(!StrEqual(ClassName, "weapon_knife")) return;
+	
+	if(!GetTrieValue(array_weapons[client], ClassName, model_index) || model_index == -1) return;
+    
+	WeaponIndex = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+	new Sequence = GetEntProp(g_PVMid[client], Prop_Send, "m_nSequence");
+	new Float:Cycle = GetEntPropFloat(g_PVMid[client], Prop_Data, "m_flCycle");
+    
+	//PrintHintText(client, "secuencia %i", Sequence);
+	
+	if ((Cycle < OldCycle[client]) && (Sequence == OldSequence[client]))
+	{
+		//PrintToConsole(client, "FIX = secuencia %i",Sequence);
+		if(Sequence == 5) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 6);
+		else if(Sequence == 6) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 5);
+		else if(Sequence == 3) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 4);
+		else if(Sequence == 4) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 3);
+		else if(Sequence == 10) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 11); 
+		else if(Sequence == 9) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 10);
+		else if(Sequence == 7) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 8);
+		else if(Sequence == 8) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 7);
+		else if(Sequence == 11) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 10);
+		
+		//SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", Sequence);
+	}
+	
+	OldWeapon[client] = WeaponIndex;
+	OldSequence[client] = Sequence;
+	OldCycle[client] = Cycle;
 }
 
 public MRESReturn OnGiveNamedItem(int client, Handle hReturn, Handle hParams)
@@ -94,6 +158,7 @@ public Action OnSpawn(Handle event, char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(GetEventInt(event, "userid"));
 	g_PVMid[client] = newWeapon_GetViewModelIndex(client, -1); 
+
 }
 
 public void OnClientPutInServer(int client)
@@ -106,6 +171,7 @@ public void OnClientPutInServer(int client)
 	{
 		DHookEntity(hGiveNamedItem, true, client);
 		DHookEntity(hGiveNamedItem2, false, client);
+		SDKHook(client, SDKHook_PostThinkPost, OnPostThinkPost);
 	}
 }
 

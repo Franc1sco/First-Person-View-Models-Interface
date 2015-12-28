@@ -103,7 +103,6 @@ public OnPostThinkPost(client)
 	
 	if(!GetTrieValue(array_weapons[client], ClassName, model_index) || model_index == -1) return;
     
-	WeaponIndex = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
 	new Sequence = GetEntProp(g_PVMid[client], Prop_Send, "m_nSequence");
 	new Float:Cycle = GetEntPropFloat(g_PVMid[client], Prop_Data, "m_flCycle");
     

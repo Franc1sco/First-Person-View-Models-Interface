@@ -190,6 +190,9 @@ public Native_RemoveWeapon(Handle:plugin, argc)
 
 RefreshWeapon(client, char[] name, int weaponindex=-1)
 {
+	if(!IsPlayerAlive(client)) return;
+	
+	
 	new weapon;
 	
 	if(weaponindex != -1) weapon = weaponindex;

@@ -21,7 +21,8 @@ public Plugin myinfo =
 
 public OnClientPostAdminCheck(client)
 {
-	if(GetUserFlagBits(client) & ADMFLAG_NEEDED) FPVMI_AddViewModelToClient(client, WEAPON, g_Model); // add custom view model to the player
+	if(GetUserFlagBits(client) & ADMFLAG_NEEDED) // if the client have the admin flag needed
+		FPVMI_AddViewModelToClient(client, WEAPON, g_Model); // add custom view model to the player
 }
 
 public OnMapStart() 

@@ -5,7 +5,7 @@
 #undef REQUIRE_EXTENSIONS
 #include <dhooks>
 
-#define DATA "1.2"
+#define DATA "1.2.2"
 
 Handle array_weapons[MAXPLAYERS+1];
 
@@ -122,6 +122,8 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	if(!GetTrieValue(array_weapons[client], classname, model_index)) return;
 	
 	Format(classname, sizeof(classname), "%s_default", classname);
+	
+	if(g_PVMid[client] == -1) g_PVMid[client] = newWeapon_GetViewModelIndex(client, -1); 
 	
 	if(model_index == -1)
 	{

@@ -2,7 +2,7 @@
 #include <sdktools>
 #include <sdkhooks>
 
-#define DATA "1.0"
+#define DATA "1.0.1"
 
 Handle array_weapons[MAXPLAYERS+1];
 
@@ -72,8 +72,8 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	
 	SetEntProp(wpnid, Prop_Send, "m_nModelIndex", 0); 
 		
-	int iWorldModel = GetEntPropEnt(wpnid, Prop_Send, "m_hWeaponWorldModel"); 
-	if(IsValidEdict(iWorldModel)) SetEntProp(iWorldModel, Prop_Send, "m_nModelIndex", 0); 
+/*  	int iWorldModel = GetEntPropEnt(wpnid, Prop_Send, "m_hWeaponWorldModel"); 
+	if(IsValidEdict(iWorldModel)) SetEntProp(iWorldModel, Prop_Send, "m_nModelIndex", 0);  */ 
 	
 	SetEntProp(g_PVMid[client], Prop_Send, "m_nModelIndex", model_index); 
 }

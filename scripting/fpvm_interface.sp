@@ -276,6 +276,7 @@ RefreshWeapon(client, char[] name, int weaponindex=-1)
 		AcceptEntityInput(weapon, "Kill");
 		//PrintToChat(client, "verdadero custom");
 		weapon = GivePlayerItem(client, name);
+		EquipPlayerWeapon(client, weapon);
 		//PrintToChat(client, "falso custom");
 
  		if(ammo1 > -1) Weapon_SetPrimaryAmmoCount(weapon, ammo1);

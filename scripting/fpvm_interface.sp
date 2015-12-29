@@ -5,7 +5,7 @@
 #undef REQUIRE_EXTENSIONS
 #include <dhooks>
 
-#define DATA "1.3.1"
+#define DATA "1.3.2"
 
 Handle array_weapons[MAXPLAYERS+1];
 
@@ -103,6 +103,12 @@ public OnPostThinkPost(client)
 	
 	if(!GetTrieValue(array_weapons[client], ClassName, model_index) || model_index == -1) return;
     
+	if(g_PVMid[client] == -1)
+	{
+		g_PVMid[client] = newWeapon_GetViewModelIndex(client, -1); 
+		if(!IsValidEdict(g_PVMid[client])) return;
+	}
+	
 	new Sequence = GetEntProp(g_PVMid[client], Prop_Send, "m_nSequence");
 	new Float:Cycle = GetEntPropFloat(g_PVMid[client], Prop_Data, "m_flCycle");
     
@@ -188,7 +194,11 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	
 	Format(classname, sizeof(classname), "%s_default", classname);
 	
-	if(g_PVMid[client] == -1) g_PVMid[client] = newWeapon_GetViewModelIndex(client, -1); 
+	if(g_PVMid[client] == -1)
+	{
+		g_PVMid[client] = newWeapon_GetViewModelIndex(client, -1); 
+		if(!IsValidEdict(g_PVMid[client])) return;
+	}
 	
 	if(model_index == -1)
 	{

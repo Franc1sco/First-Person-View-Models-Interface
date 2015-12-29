@@ -5,7 +5,7 @@
 #undef REQUIRE_EXTENSIONS
 #include <dhooks>
 
-#define DATA "1.3"
+#define DATA "1.3.1"
 
 Handle array_weapons[MAXPLAYERS+1];
 

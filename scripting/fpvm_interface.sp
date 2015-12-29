@@ -97,7 +97,7 @@ public OnPostThinkPost(client)
 	char ClassName[64];
 	new WeaponIndex = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
 	
-	if(!GetEdictClassname(WeaponIndex, ClassName, 64)) return;
+	if(!IsValidEdict(WeaponIndex) || !GetEdictClassname(WeaponIndex, ClassName, 64)) return;
 	
 	if(!StrEqual(ClassName, "weapon_knife")) return;
 	

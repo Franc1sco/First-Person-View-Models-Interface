@@ -5,7 +5,7 @@
 #undef REQUIRE_EXTENSIONS
 #include <dhooks>
 
-#define DATA "1.3.2"
+#define DATA "1.4"
 
 Handle array_weapons[MAXPLAYERS+1];
 
@@ -16,9 +16,10 @@ int g_PVMid[MAXPLAYERS+1];
 Handle hGiveNamedItem, hGiveNamedItem2;
 bool nosir[MAXPLAYERS+1];
 
-new OldWeapon[MAXPLAYERS + 1];
-new OldSequence[MAXPLAYERS + 1];
-new Float:OldCycle[MAXPLAYERS + 1];
+new OldSequence[MAXPLAYERS+1];
+new Float:OldCycle[MAXPLAYERS+1];
+
+bool hook[MAXPLAYERS+1];
 
 public Plugin myinfo = 
 {
@@ -47,10 +48,8 @@ public void OnPluginStart()
 {
 	CreateConVar("sm_fpvmi_version", DATA, "", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
 	
-	HookEvent("player_spawn", OnSpawn);
 	//HookEvent("weapon_fire", EventWeaponFire);
-	
-	if(!eco_items) return;
+	HookEvent("player_death", PlayerDeath, EventHookMode_Pre);
 	
 	Handle hGameConf;
 	
@@ -81,56 +80,52 @@ public void OnPluginStart()
 	
 	if(!GetTrieValue(array_weapons[client], classname, model_index) || model_index == -1) return;
 	
-	SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 0);
+	new Sequence = GetEntProp(g_PVMid[client], Prop_Send, "m_nSequence");
 	
-	PrintToChat(client, "hecho");
+	PrintToConsole(client, "secuencia POST fire %i",Sequence);
 } */
 
-public OnPostThinkPost(client)
+public OnPostThinkPostKnifeFix(client)
 {
-	if (!IsPlayerAlive(client))
+	new clientview = EntRefToEntIndex(g_PVMid[client]);
+	if(clientview == INVALID_ENT_REFERENCE)
 	{
-        return;
+		SDKUnhook(client, SDKHook_PostThinkPost, OnPostThinkPostKnifeFix);
+		//PrintToChat(client, "quitado");
+		hook[client] = false;
+		return;
 	}
 	
-	new model_index;
-	char ClassName[64];
-	new WeaponIndex = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
-	
-	if(!IsValidEdict(WeaponIndex) || !GetEdictClassname(WeaponIndex, ClassName, 64)) return;
-	
-	if(!StrEqual(ClassName, "weapon_knife")) return;
-	
-	if(!GetTrieValue(array_weapons[client], ClassName, model_index) || model_index == -1) return;
-    
-	if(g_PVMid[client] == -1)
-	{
-		g_PVMid[client] = newWeapon_GetViewModelIndex(client, -1); 
-		if(!IsValidEdict(g_PVMid[client])) return;
-	}
-	
-	new Sequence = GetEntProp(g_PVMid[client], Prop_Send, "m_nSequence");
-	new Float:Cycle = GetEntPropFloat(g_PVMid[client], Prop_Data, "m_flCycle");
-    
-	//PrintHintText(client, "secuencia %i", Sequence);
-	
+	new Sequence = GetEntProp(clientview, Prop_Send, "m_nSequence");
+	new Float:Cycle = GetEntPropFloat(clientview, Prop_Data, "m_flCycle");
 	if ((Cycle < OldCycle[client]) && (Sequence == OldSequence[client]))
 	{
 		//PrintToConsole(client, "FIX = secuencia %i",Sequence);
-		if(Sequence == 5) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 6);
-		else if(Sequence == 6) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 5);
-		else if(Sequence == 3) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 4);
-		else if(Sequence == 4) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 3);
-		else if(Sequence == 10) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 11); 
-		else if(Sequence == 9) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 10);
-		else if(Sequence == 7) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 8);
-		else if(Sequence == 8) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 7);
-		else if(Sequence == 11) SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", 10);
+		switch (Sequence)
+		{
+			case 3:
+				SetEntProp(clientview, Prop_Send, "m_nSequence", 4);
+			case 4:
+				SetEntProp(clientview, Prop_Send, "m_nSequence", 3);
+			case 5:
+				SetEntProp(clientview, Prop_Send, "m_nSequence", 6);
+			case 6:
+				SetEntProp(clientview, Prop_Send, "m_nSequence", 5);
+			case 7:
+				SetEntProp(clientview, Prop_Send, "m_nSequence", 8);
+			case 8:
+				SetEntProp(clientview, Prop_Send, "m_nSequence", 7);
+			case 9:
+				SetEntProp(clientview, Prop_Send, "m_nSequence", 10);
+			case 10:
+				SetEntProp(clientview, Prop_Send, "m_nSequence", 11); 
+			case 11:
+				SetEntProp(clientview, Prop_Send, "m_nSequence", 10);
+		}
 		
-		//SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", Sequence);
+		//SetEntProp(clientview, Prop_Send, "m_nSequence", Sequence);
 	}
 	
-	OldWeapon[client] = WeaponIndex;
 	OldSequence[client] = Sequence;
 	OldCycle[client] = Cycle;
 }
@@ -145,8 +140,12 @@ public MRESReturn OnGiveNamedItem(int client, Handle hReturn, Handle hParams)
 	if(!GetTrieValue(array_weapons[client], classname, model_index) || model_index == -1) return MRES_Ignored;
 	
 	new weapon = DHookGetReturn(hReturn);
-	SetEntProp(weapon, Prop_Send, "m_iItemIDLow", 0);
-	SetEntProp(weapon, Prop_Send, "m_iItemIDHigh", 0);
+	
+	if(eco_items)
+	{
+		SetEntProp(weapon, Prop_Send, "m_iItemIDLow", 0);
+		SetEntProp(weapon, Prop_Send, "m_iItemIDHigh", 0);
+	}
 	
 	nosir[client] = false;
 	return MRES_Ignored;
@@ -159,53 +158,87 @@ public MRESReturn OnGiveNamedItemPre(int client, Handle hReturn, Handle hParams)
 	return MRES_Ignored;
 }
 
-public Action OnSpawn(Handle event, char[] name, bool dontBroadcast) 
-{
-	int client = GetClientOfUserId(GetEventInt(event, "userid"));
-	g_PVMid[client] = newWeapon_GetViewModelIndex(client, -1); 
-
-}
-
 public void OnClientPutInServer(int client)
 {
+	if(IsFakeClient(client)) return;
+	
+	g_PVMid[client] = INVALID_ENT_REFERENCE;
+	hook[client] = false;
+	
 	array_weapons[client] = CreateTrie();
 	
 	SDKHook(client, SDKHook_WeaponSwitchPost, OnClientWeaponSwitchPost); 
+	SDKHook(client, SDKHook_WeaponSwitch, OnClientWeaponSwitch); 
 	
-	if(eco_items && !IsFakeClient(client))
+	if(eco_items)
 	{
 		DHookEntity(hGiveNamedItem, true, client);
 		DHookEntity(hGiveNamedItem2, false, client);
-		SDKHook(client, SDKHook_PostThinkPost, OnPostThinkPost);
+		//SDKHook(client, SDKHook_PostThinkPost, OnPostThinkPostKnifeFix);
+	}
+}
+
+public Action PlayerDeath(Handle event, char[] name, bool dontBroadcast)
+{
+	int client = GetClientOfUserId(GetEventInt(event, "userid"));
+	if(hook[client])
+	{
+		//PrintToChat(client, "quitado");
+		SDKUnhook(client, SDKHook_PostThinkPost, OnPostThinkPostKnifeFix);
+		hook[client] = false;
+	}
+}
+
+public void OnClientWeaponSwitch(int client, int wpnid) 
+{ 
+	if(hook[client])
+	{
+		//PrintToChat(client, "quitado");
+		SDKUnhook(client, SDKHook_PostThinkPost, OnPostThinkPostKnifeFix);
+		hook[client] = false;
 	}
 }
 
 public void OnClientWeaponSwitchPost(int client, int wpnid) 
 { 
-	if(wpnid < 1) return;
+	if(wpnid < 1)
+	{
+		return;
+	}
+	char classname[64], classname_default[64];
 	
-	char classname[64];
-	
-	if(!GetEdictClassname(wpnid, classname, sizeof(classname))) return;
+	if(!GetEdictClassname(wpnid, classname, sizeof(classname)))
+	{
+		return;
+	}
 	
 	new model_index;
 	
-	if(!GetTrieValue(array_weapons[client], classname, model_index)) return;
+	if(!GetTrieValue(array_weapons[client], classname, model_index))
+	{
+		return;
+	}
 	
-	Format(classname, sizeof(classname), "%s_default", classname);
+	Format(classname_default, sizeof(classname_default), "%s_default", classname);
 	
-	if(g_PVMid[client] == -1)
+	
+	new clientview = EntRefToEntIndex(g_PVMid[client]);
+	if(clientview == INVALID_ENT_REFERENCE)
 	{
 		g_PVMid[client] = newWeapon_GetViewModelIndex(client, -1); 
-		if(!IsValidEdict(g_PVMid[client])) return;
+		clientview = EntRefToEntIndex(g_PVMid[client]);
+		if(clientview == INVALID_ENT_REFERENCE) 
+		{
+			return;
+		}
 	}
 	
 	if(model_index == -1)
 	{
-		if(!GetTrieValue(array_weapons[client], classname, model_index) || model_index == -1) return;
+		if(!GetTrieValue(array_weapons[client], classname_default, model_index) || model_index == -1) return;
 		
-		SetEntProp(g_PVMid[client], Prop_Send, "m_nModelIndex", model_index); 
-		SetTrieValue(array_weapons[client], classname, -1);
+		SetEntProp(clientview, Prop_Send, "m_nModelIndex", model_index); 
+		SetTrieValue(array_weapons[client], classname_default, -1);
 		return;
 	}
 	
@@ -213,9 +246,9 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	{
 		if(GetEntProp(wpnid, Prop_Send, "m_iItemIDLow") != 0 || GetEntProp(wpnid, Prop_Send, "m_iItemIDHigh") != 0) 
 		{
-			if(!GetTrieValue(array_weapons[client], classname, model_index) || model_index == -1) return;
+			if(!GetTrieValue(array_weapons[client], classname_default, model_index) || model_index == -1) return;
 			
-			SetEntProp(g_PVMid[client], Prop_Send, "m_nModelIndex", model_index); 
+			SetEntProp(clientview, Prop_Send, "m_nModelIndex", model_index); 
 			return;
 			
 		}
@@ -228,9 +261,16 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	
 	int model_index_custom = model_index;
 	
-	if(!GetTrieValue(array_weapons[client], classname, model_index) || model_index == -1) SetTrieValue(array_weapons[client], classname, GetEntProp(g_PVMid[client], Prop_Send, "m_nModelIndex"));
+	if(!GetTrieValue(array_weapons[client], classname_default, model_index) || model_index == -1) SetTrieValue(array_weapons[client], classname_default, GetEntProp(clientview, Prop_Send, "m_nModelIndex"));
 	
-	SetEntProp(g_PVMid[client], Prop_Send, "m_nModelIndex", model_index_custom); 
+	SetEntProp(clientview, Prop_Send, "m_nModelIndex", model_index_custom); 
+	
+	if(StrEqual(classname, "weapon_knife"))
+	{
+		hook[client] = true;
+		//PrintToChat(client, "puesto");
+		SDKHook(client, SDKHook_PostThinkPost, OnPostThinkPostKnifeFix);
+	}
 }
 
 public void OnClientDisconnect(int client)
@@ -272,8 +312,8 @@ RefreshWeapon(client, char[] name, int weaponindex=-1)
 	
 	new weapon;
 	
-	if(weaponindex != -1) weapon = weaponindex;
-	else weapon = Client_GetWeapon(client, name);
+	if(weaponindex == -1) weapon = Client_GetWeapon(client, name);
+	else weapon = weaponindex;
 	
 	if(weapon != INVALID_ENT_REFERENCE)
 	{
@@ -303,21 +343,25 @@ RefreshWeapon(client, char[] name, int weaponindex=-1)
 // Get model index and prevent server from crash 
 int newWeapon_GetViewModelIndex(int client, int sIndex) 
 { 
-    while ((sIndex = FindEntityByClassname2(sIndex, "predicted_viewmodel")) != -1) 
-    { 
-        int Owner = GetEntPropEnt(sIndex, Prop_Send, "m_hOwner"); 
-        int ClientWeapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon"); 
-        int Weapon = GetEntPropEnt(sIndex, Prop_Send, "m_hWeapon"); 
+	int Owner;
+	//int ClientWeapon;
+	//int Weapon;
+	
+	while ((sIndex = FindEntityByClassname2(sIndex, "predicted_viewmodel")) != -1) 
+	{ 
+		Owner = GetEntPropEnt(sIndex, Prop_Send, "m_hOwner"); 
+		//ClientWeapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon"); 
+		//Weapon = GetEntPropEnt(sIndex, Prop_Send, "m_hWeapon");
          
-        if (Owner != client) 
-            continue; 
+		if (Owner != client) 
+			continue; 
          
-        if (ClientWeapon != Weapon) 
-            continue; 
+		//if (ClientWeapon != Weapon) 
+			//continue;
          
-        return sIndex; 
-    } 
-    return -1; 
+		return EntIndexToEntRef(sIndex); 
+	} 
+	return INVALID_ENT_REFERENCE; 
 } 
 // Get entity name 
 int FindEntityByClassname2(int sStartEnt, char[] szClassname) 

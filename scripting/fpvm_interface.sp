@@ -2,10 +2,10 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <smlib>
-#undef REQUIRE_EXTENSIONS
+//#undef REQUIRE_EXTENSIONS
 #include <dhooks>
 
-#define DATA "1.4"
+#define DATA "2.0"
 
 Handle array_weapons[MAXPLAYERS+1];
 
@@ -34,12 +34,15 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 {
 	if(GetEngineVersion() == Engine_CSGO || GetEngineVersion() == Engine_TF2) eco_items = true;
 	
-	CreateNative("FPVMI_AddViewModelToClient", Native_AddWeapon);
-	CreateNative("FPVMI_RemoveViewModelToClient", Native_RemoveWeapon);
+	CreateNative("FPVMI_AddViewModelToClient", Native_AddViewWeapon);
+	CreateNative("FPVMI_RemoveViewModelToClient", Native_RemoveViewWeapon);
+	CreateNative("FPVMI_SetClientModel", Native_SetWeapon);
+	CreateNative("FPVMI_AddWorldModelToClient", Native_AddWorldWeapon);
+	CreateNative("FPVMI_RemoveWorldModelToClient", Native_RemoveWorldWeapon);
     
-	MarkNativeAsOptional("DHookCreate");
+/* 	MarkNativeAsOptional("DHookCreate");
 	MarkNativeAsOptional("DHookAddParam");
-	MarkNativeAsOptional("DHookEntity");
+	MarkNativeAsOptional("DHookEntity"); */
 	
 	return APLRes_Success;
 }
@@ -205,7 +208,7 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	{
 		return;
 	}
-	char classname[64], classname_default[64];
+	char classname[64];
 	
 	if(!GetEdictClassname(wpnid, classname, sizeof(classname)))
 	{
@@ -219,7 +222,9 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 		return;
 	}
 	
+	char classname_default[64], classname_world[64];
 	Format(classname_default, sizeof(classname_default), "%s_default", classname);
+	Format(classname_world, sizeof(classname_world), "%s_world", classname);
 	
 	
 	new clientview = EntRefToEntIndex(g_PVMid[client]);
@@ -256,8 +261,14 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	
 	SetEntProp(wpnid, Prop_Send, "m_nModelIndex", 0); 
 		
-/*  	int iWorldModel = GetEntPropEnt(wpnid, Prop_Send, "m_hWeaponWorldModel"); 
-	if(IsValidEdict(iWorldModel)) SetEntProp(iWorldModel, Prop_Send, "m_nModelIndex", 0);  */ 
+	new model_world;
+	if(GetTrieValue(array_weapons[client], classname_world, model_world) && model_world != -1)
+	{
+		int iWorldModel = GetEntPropEnt(wpnid, Prop_Send, "m_hWeaponWorldModel"); 
+		if(IsValidEdict(iWorldModel)) SetEntProp(iWorldModel, Prop_Send, "m_nModelIndex", model_world);
+		
+		//PrintToChat(client, "dado");
+	}
 	
 	int model_index_custom = model_index;
 	
@@ -280,40 +291,76 @@ public void OnClientDisconnect(int client)
 	array_weapons[client] = INVALID_HANDLE;
 }
 
-public Native_AddWeapon(Handle:plugin, argc)
+public Native_AddViewWeapon(Handle:plugin, argc)
 {  
 	char name[64];
 	
 	int client = GetNativeCell(1);
 	GetNativeString(2, name, 64);
 	int model_index = GetNativeCell(3);
-	
 	SetTrieValue(array_weapons[client], name, model_index);
 	
 	RefreshWeapon(client, name);
 }
 
-public Native_RemoveWeapon(Handle:plugin, argc)
+public Native_AddWorldWeapon(Handle:plugin, argc)
+{  
+	char name[64], world[64];
+	
+	int client = GetNativeCell(1);
+	GetNativeString(2, name, 64);
+	int model_world = GetNativeCell(3);
+	Format(world, 64, "%s_world", name);
+	SetTrieValue(array_weapons[client], world, model_world);
+	
+	RefreshWeapon(client, name);
+}
+
+public Native_SetWeapon(Handle:plugin, argc)
+{  
+	char name[64], world[64];
+	
+	int client = GetNativeCell(1);
+	GetNativeString(2, name, 64);
+	int model_index = GetNativeCell(3);
+	int model_world = GetNativeCell(4);
+	Format(world, 64, "%s_world", name);
+	SetTrieValue(array_weapons[client], name, model_index);
+	SetTrieValue(array_weapons[client], world, model_world);
+	
+	RefreshWeapon(client, name);
+}
+
+
+public Native_RemoveViewWeapon(Handle:plugin, argc)
 {  
 	char name[64];
 	
 	int client = GetNativeCell(1);
 	GetNativeString(2, name, 64);
-	
 	SetTrieValue(array_weapons[client], name, -1);
 	
 	RefreshWeapon(client, name);
 }
 
-RefreshWeapon(client, char[] name, int weaponindex=-1)
+public Native_RemoveWorldWeapon(Handle:plugin, argc)
+{  
+	char name[64], world[64];
+	
+	int client = GetNativeCell(1);
+	GetNativeString(2, name, 64);
+	Format(world, 64, "%s_world", name);
+	SetTrieValue(array_weapons[client], world, -1);
+	
+	RefreshWeapon(client, name);
+}
+
+RefreshWeapon(client, char[] name)
 {
 	if(!IsPlayerAlive(client)) return;
 	
 	
-	new weapon;
-	
-	if(weaponindex == -1) weapon = Client_GetWeapon(client, name);
-	else weapon = weaponindex;
+	new weapon = Client_GetWeapon(client, name);
 	
 	if(weapon != INVALID_ENT_REFERENCE)
 	{
@@ -324,9 +371,9 @@ RefreshWeapon(client, char[] name, int weaponindex=-1)
 		
 		RemovePlayerItem(client, weapon);
 		AcceptEntityInput(weapon, "Kill");
-		//PrintToChat(client, "verdadero custom");
+		//PrintToChat(client, "verdadero custom %s", name);
 		weapon = GivePlayerItem(client, name);
-		EquipPlayerWeapon(client, weapon);
+		if(StrEqual(name, "weapon_knife")) EquipPlayerWeapon(client, weapon);
 		//PrintToChat(client, "falso custom");
 
  		if(ammo1 > -1) Weapon_SetPrimaryAmmoCount(weapon, ammo1);

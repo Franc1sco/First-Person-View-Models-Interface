@@ -26,6 +26,24 @@ native FPVMI_AddViewModelToClient(int client, char[] weapon, int weaponview_inde
 native FPVMI_AddWorldModelToClient(int client, char[] weapon, int weaponworld_index=-1);
 
 /**
+ * Return the custom world model index of a client
+ *
+ * @param client     Player for check
+ * @String weapon     Weapon to search
+ * @return Return the custom world model index of a client. -1 if the client dont have a custom world model
+ */
+native int FPVMI_GetClientWorldModel(int client, char[] weapon);
+
+/**
+ * Return the custom view model index of a client
+ *
+ * @param client     Player for check
+ * @String weapon     Weapon to search
+ * @return Return the custom wview model index of a client. -1 if the client dont have a custom view model
+ */
+native int FPVMI_GetClientViewModel(int client, char[] weapon);
+
+/**
  * Set a custom view/world model to a weapon
  *
  * @param client     Player for check

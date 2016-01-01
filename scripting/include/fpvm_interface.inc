@@ -26,6 +26,24 @@ native FPVMI_AddViewModelToClient(int client, char[] weapon, int weaponview_inde
 native FPVMI_AddWorldModelToClient(int client, char[] weapon, int weaponworld_index=-1);
 
 /**
+ * Return the custom world model index of a client
+ *
+ * @param client     Player for check
+ * @String weapon     Weapon to search
+ * @return Return the custom world model index of a client. -1 if the client dont have a custom world model
+ */
+native int FPVMI_GetClientWorldModel(int client, char[] weapon);
+
+/**
+ * Return the custom view model index of a client
+ *
+ * @param client     Player for check
+ * @String weapon     Weapon to search
+ * @return Return the custom wview model index of a client. -1 if the client dont have a custom view model
+ */
+native int FPVMI_GetClientViewModel(int client, char[] weapon);
+
+/**
  * Set a custom view/world model to a weapon
  *
  * @param client     Player for check
@@ -53,3 +71,21 @@ native FPVMI_RemoveViewModelToClient(int client, char[] weapon);
  * @return no return
  */
 native FPVMI_RemoveWorldModelToClient(int client, char[] weapon);
+
+/**
+ * Called when a View model has been set.
+ *
+ * @param client            Client.
+ * @String weapon     Weapon
+ * @param weapon_index     The weapon precached index 
+ */
+forward FPVMI_OnClientViewModel(client, const String:weapon[], weapon_index);
+
+/**
+ * Called when a World model has been set.
+ *
+ * @param client            Client.
+ * @String weapon     Weapon
+ * @param weaponworld_index     The weapon precached index 
+ */
+forward FPVMI_OnClientWorldModel(client, const String:weapon[], weaponworld_index);

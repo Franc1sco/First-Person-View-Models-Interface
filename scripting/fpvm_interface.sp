@@ -5,7 +5,7 @@
 //#undef REQUIRE_EXTENSIONS
 #include <dhooks>
 
-#define DATA "2.2"
+#define DATA "2.2.1"
 
 Handle trie_weapons[MAXPLAYERS+1];
 
@@ -180,7 +180,10 @@ public MRESReturn OnGiveNamedItem(int client, Handle hReturn, Handle hParams)
 	char classname[64];
 	
 	DHookGetParamString(hParams, 1, classname, 64);
+	if(StrContains(classname, "item", false) == 0) return MRES_Ignored;
+	
 	new weapon = DHookGetReturn(hReturn);
+	
 	new weaponindex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
 	switch (weaponindex)
 	{
@@ -295,6 +298,8 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	{
 		return;
 	}
+	
+	if(StrContains(classname, "item", false) == 0) return;
 	
 	new weaponindex = GetEntProp(wpnid, Prop_Send, "m_iItemDefinitionIndex");
 	switch (weaponindex)

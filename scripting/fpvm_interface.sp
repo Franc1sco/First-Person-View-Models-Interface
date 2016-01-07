@@ -5,7 +5,7 @@
 //#undef REQUIRE_EXTENSIONS
 #include <dhooks>
 
-#define DATA "2.1"
+#define DATA "2.2"
 
 Handle trie_weapons[MAXPLAYERS+1];
 
@@ -18,6 +18,8 @@ bool nosir[MAXPLAYERS+1];
 
 new OldSequence[MAXPLAYERS+1];
 new Float:OldCycle[MAXPLAYERS+1];
+
+char g_classname[MAXPLAYERS+1][64];
 
 bool hook[MAXPLAYERS+1];
 
@@ -108,29 +110,63 @@ public OnPostThinkPostKnifeFix(client)
 	new Float:Cycle = GetEntPropFloat(clientview, Prop_Data, "m_flCycle");
 	if ((Cycle < OldCycle[client]) && (Sequence == OldSequence[client]))
 	{
-		//PrintToConsole(client, "FIX = secuencia %i",Sequence);
-		switch (Sequence)
+		if(StrEqual(g_classname[client], "weapon_knife"))
 		{
-			case 3:
-				SetEntProp(clientview, Prop_Send, "m_nSequence", 4);
-			case 4:
-				SetEntProp(clientview, Prop_Send, "m_nSequence", 3);
-			case 5:
-				SetEntProp(clientview, Prop_Send, "m_nSequence", 6);
-			case 6:
-				SetEntProp(clientview, Prop_Send, "m_nSequence", 5);
-			case 7:
-				SetEntProp(clientview, Prop_Send, "m_nSequence", 8);
-			case 8:
-				SetEntProp(clientview, Prop_Send, "m_nSequence", 7);
-			case 9:
-				SetEntProp(clientview, Prop_Send, "m_nSequence", 10);
-			case 10:
-				SetEntProp(clientview, Prop_Send, "m_nSequence", 11); 
-			case 11:
-				SetEntProp(clientview, Prop_Send, "m_nSequence", 10);
+			//PrintToConsole(client, "FIX = secuencia %i",Sequence);
+			switch (Sequence)
+			{
+				case 3:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 4);
+				case 4:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 3);
+				case 5:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 6);
+				case 6:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 5);
+				case 7:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 8);
+				case 8:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 7);
+				case 9:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 10);
+				case 10:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 11); 
+				case 11:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 10);
+			}
 		}
-		
+		else if(StrEqual(g_classname[client], "weapon_ak47"))
+		{
+			switch (Sequence)
+			{
+				case 3:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 2);
+				case 2:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 1);
+				case 1:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 3);			
+			}
+		}
+		else if(StrEqual(g_classname[client], "weapon_mp7"))
+		{
+			switch (Sequence)
+			{
+				case 3:
+				{
+					SetEntProp(clientview, Prop_Send, "m_nSequence", -1);
+				}
+			}
+		}
+		else if(StrEqual(g_classname[client], "weapon_awp"))
+		{
+			switch (Sequence)
+			{
+				case 1:
+				{
+					SetEntProp(clientview, Prop_Send, "m_nSequence", -1);	
+				}	
+			}
+		}
 		//SetEntProp(clientview, Prop_Send, "m_nSequence", Sequence);
 	}
 	
@@ -144,10 +180,18 @@ public MRESReturn OnGiveNamedItem(int client, Handle hReturn, Handle hParams)
 	char classname[64];
 	
 	DHookGetParamString(hParams, 1, classname, 64);
+	new weapon = DHookGetReturn(hReturn);
+	new weaponindex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
+	switch (weaponindex)
+	{
+		case 60: strcopy(classname, 64, "weapon_m4a1_silencer");
+		case 61: strcopy(classname, 64, "weapon_usp_silencer");
+		case 63: strcopy(classname, 64, "weapon_cz75a");
+		case 64: strcopy(classname, 64, "weapon_revolver");
+	}
 	
 	if(!GetTrieValue(trie_weapons[client], classname, model_index) || model_index == -1) return MRES_Ignored;
 	
-	new weapon = DHookGetReturn(hReturn);
 	
 	if(eco_items)
 	{
@@ -183,8 +227,40 @@ public void OnClientPutInServer(int client)
 		DHookEntity(hGiveNamedItem, true, client);
 		DHookEntity(hGiveNamedItem2, false, client);
 		//SDKHook(client, SDKHook_PostThinkPost, OnPostThinkPostKnifeFix);
+		//SDKHook(client, SDKHook_PostThinkPost, OnPostThinkPost);
 	}
 }
+
+/* public OnPostThinkPost(client)
+{
+	if (!IsPlayerAlive(client))
+	{
+        return;
+	}
+	
+	new model_index;
+    
+	if(g_PVMid[client] == -1)
+	{
+		g_PVMid[client] = newWeapon_GetViewModelIndex(client, -1); 
+		if(!IsValidEdict(g_PVMid[client])) return;
+	}
+	
+	new Sequence = GetEntProp(g_PVMid[client], Prop_Send, "m_nSequence");
+	new Float:Cycle = GetEntPropFloat(g_PVMid[client], Prop_Data, "m_flCycle");
+    
+	PrintHintText(client, "secuencia %i", Sequence);
+	
+	if ((Cycle < OldCycle[client]) && (Sequence == OldSequence[client]))
+	{
+		PrintToConsole(client, "FIX = secuencia %i",Sequence);
+		
+		//SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", Sequence);
+	}
+	
+	OldSequence[client] = Sequence;
+	OldCycle[client] = Cycle;
+} */
 
 public Action PlayerDeath(Handle event, char[] name, bool dontBroadcast)
 {
@@ -218,6 +294,15 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	if(!GetEdictClassname(wpnid, classname, sizeof(classname)))
 	{
 		return;
+	}
+	
+	new weaponindex = GetEntProp(wpnid, Prop_Send, "m_iItemDefinitionIndex");
+	switch (weaponindex)
+	{
+		case 60: strcopy(classname, 64, "weapon_m4a1_silencer");
+		case 61: strcopy(classname, 64, "weapon_usp_silencer");
+		case 63: strcopy(classname, 64, "weapon_cz75a");
+		case 64: strcopy(classname, 64, "weapon_revolver");
 	}
 	
 	new model_index;
@@ -281,12 +366,9 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	
 	SetEntProp(clientview, Prop_Send, "m_nModelIndex", model_index_custom); 
 	
-	if(StrEqual(classname, "weapon_knife"))
-	{
-		hook[client] = true;
-		//PrintToChat(client, "puesto");
-		SDKHook(client, SDKHook_PostThinkPost, OnPostThinkPostKnifeFix);
-	}
+	hook[client] = true;
+	Format(g_classname[client], 64, classname);
+	SDKHook(client, SDKHook_PostThinkPost, OnPostThinkPostKnifeFix);
 }
 
 public void OnClientDisconnect(int client)

@@ -5,7 +5,7 @@
 //#undef REQUIRE_EXTENSIONS
 #include <dhooks>
 
-#define DATA "2.2.2"
+#define DATA "2.2.3"
 
 Handle trie_weapons[MAXPLAYERS+1];
 
@@ -78,6 +78,12 @@ public void OnPluginStart()
 	DHookAddParam(hGiveNamedItem, HookParamType_Bool);
 	
 	hGiveNamedItem2 = DHookCreate(iOffset, HookType_Entity, ReturnType_CBaseEntity, ThisPointer_CBaseEntity, OnGiveNamedItemPre);
+	
+	for(int i = 1; i <= MaxClients; i++)
+		if(IsClientInGame(i))
+		{
+			OnClientPutInServer(i);
+		}
 }
 
 /* public Action:EventWeaponFire(Handle:event, const String:name[], bool:dontBroadcast)
@@ -181,6 +187,7 @@ public MRESReturn OnGiveNamedItem(int client, Handle hReturn, Handle hParams)
 	
 	DHookGetParamString(hParams, 1, classname, 64);
 	if(StrContains(classname, "item", false) == 0) return MRES_Ignored;
+	if(StrContains(classname, "ammo", false) == 0) return MRES_Ignored;
 	
 	new weapon = DHookGetReturn(hReturn);
 	if(weapon < 1) return MRES_Ignored;

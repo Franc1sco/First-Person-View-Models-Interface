@@ -2,10 +2,9 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <smlib>
-//#undef REQUIRE_EXTENSIONS
-#include <dhooks>
 
-#define DATA "2.2.3"
+
+#define DATA "3.0"
 
 Handle trie_weapons[MAXPLAYERS+1];
 
@@ -13,8 +12,7 @@ bool eco_items = false;
 
 int g_PVMid[MAXPLAYERS+1];
 
-Handle hGiveNamedItem, hGiveNamedItem2, OnClientView, OnClientWorld;
-bool nosir[MAXPLAYERS+1];
+Handle OnClientView, OnClientWorld, OnClientDrop;
 
 new OldSequence[MAXPLAYERS+1];
 new Float:OldCycle[MAXPLAYERS+1];
@@ -37,19 +35,22 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	if(GetEngineVersion() == Engine_CSGO || GetEngineVersion() == Engine_TF2) eco_items = true;
 	
 	CreateNative("FPVMI_AddViewModelToClient", Native_AddViewWeapon);
-	CreateNative("FPVMI_RemoveViewModelToClient", Native_RemoveViewWeapon);
+	CreateNative("FPVMI_AddWorldModelToClient", Native_AddWorldWeapon);
+	CreateNative("FPVMI_AddDropModelToClient", Native_AddDropWeapon);
+	
 	CreateNative("FPVMI_SetClientModel", Native_SetWeapon);
+	
 	CreateNative("FPVMI_GetClientViewModel", Native_GetWeaponView);
 	CreateNative("FPVMI_GetClientWorldModel", Native_GetWeaponWorld);
-	CreateNative("FPVMI_AddWorldModelToClient", Native_AddWorldWeapon);
+	CreateNative("FPVMI_GetClientDropModel", Native_GetWeaponWorld);
+	
+	CreateNative("FPVMI_RemoveViewModelToClient", Native_RemoveViewWeapon);
 	CreateNative("FPVMI_RemoveWorldModelToClient", Native_RemoveWorldWeapon);
+	CreateNative("FPVMI_RemoveDropModelToClient", Native_RemoveWorldWeapon);
 	
 	OnClientView = CreateGlobalForward("FPVMI_OnClientViewModel", ET_Ignore, Param_Cell, Param_String, Param_Cell);
 	OnClientWorld = CreateGlobalForward("FPVMI_OnClientWorldModel", ET_Ignore, Param_Cell, Param_String, Param_Cell);
-    
-/* 	MarkNativeAsOptional("DHookCreate");
-	MarkNativeAsOptional("DHookAddParam");
-	MarkNativeAsOptional("DHookEntity"); */
+	OnClientDrop = CreateGlobalForward("FPVMI_OnClientDropModel", ET_Ignore, Param_Cell, Param_String, Param_String);
 	
 	return APLRes_Success;
 }
@@ -58,26 +59,7 @@ public void OnPluginStart()
 {
 	CreateConVar("sm_fpvmi_version", DATA, "", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
 	
-	//HookEvent("weapon_fire", EventWeaponFire);
 	HookEvent("player_death", PlayerDeath, EventHookMode_Pre);
-	
-	Handle hGameConf;
-	
-	hGameConf = LoadGameConfigFile("sdktools.games");
-	if(hGameConf == INVALID_HANDLE)
-		SetFailState("Gamedata file sdktools.games.txt is missing.");
-	int iOffset = GameConfGetOffset(hGameConf, "GiveNamedItem");
-	CloseHandle(hGameConf);
-	if(iOffset == -1)
-		SetFailState("Gamedata is missing the \"GiveNamedItem\" offset.");
-	
-	hGiveNamedItem = DHookCreate(iOffset, HookType_Entity, ReturnType_CBaseEntity, ThisPointer_CBaseEntity, OnGiveNamedItem);
-	DHookAddParam(hGiveNamedItem, HookParamType_CharPtr);
-	DHookAddParam(hGiveNamedItem, HookParamType_Int);
-	DHookAddParam(hGiveNamedItem, HookParamType_Unknown);
-	DHookAddParam(hGiveNamedItem, HookParamType_Bool);
-	
-	hGiveNamedItem2 = DHookCreate(iOffset, HookType_Entity, ReturnType_CBaseEntity, ThisPointer_CBaseEntity, OnGiveNamedItemPre);
 	
 	for(int i = 1; i <= MaxClients; i++)
 		if(IsClientInGame(i))
@@ -86,27 +68,12 @@ public void OnPluginStart()
 		}
 }
 
-/* public Action:EventWeaponFire(Handle:event, const String:name[], bool:dontBroadcast)
-{
-    // Get all required event info.
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	new model_index;
-	char classname[64];
-	if(!GetEdictClassname(GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon"), classname, 64)) return;
-	
-	if(!GetTrieValue(trie_weapons[client], classname, model_index) || model_index == -1) return;
-	
-	new Sequence = GetEntProp(g_PVMid[client], Prop_Send, "m_nSequence");
-	
-	PrintToConsole(client, "secuencia POST fire %i",Sequence);
-} */
-
-public OnPostThinkPostKnifeFix(client)
+public OnPostThinkPostAnimationFix(client)
 {
 	new clientview = EntRefToEntIndex(g_PVMid[client]);
 	if(clientview == INVALID_ENT_REFERENCE)
 	{
-		SDKUnhook(client, SDKHook_PostThinkPost, OnPostThinkPostKnifeFix);
+		SDKUnhook(client, SDKHook_PostThinkPost, OnPostThinkPostAnimationFix);
 		//PrintToChat(client, "quitado");
 		hook[client] = false;
 		return;
@@ -180,17 +147,60 @@ public OnPostThinkPostKnifeFix(client)
 	OldCycle[client] = Cycle;
 }
 
-public MRESReturn OnGiveNamedItem(int client, Handle hReturn, Handle hParams)
+public Action Hook_WeaponDrop(int client, int wpnid)
 {
+	if(wpnid < 1)
+	{
+		return;
+	}
+	
+	CreateTimer(0.0, SetWorldModel, EntIndexToEntRef(wpnid));
+}
+
+public Action SetWorldModel(Handle tmr, any ref)
+{
+	new wpnid = EntRefToEntIndex(ref);
+	
+	if(wpnid == INVALID_ENT_REFERENCE) return;
+	
+	char globalName[64];
+	Entity_GetGlobalName(wpnid, globalName, sizeof(globalName));
+	if(StrContains(globalName, "custom", false) != 0)
+	{
+		return;
+	}
+	
+	ReplaceString(globalName, 64, "custom", "");
+
+	decl String:bit[2][128];
+
+	ExplodeString(globalName, ";", bit, sizeof bit, sizeof bit[]);
+
+	if(!StrEqual(bit[1], "none")) SetEntityModel(wpnid, bit[1]);
+	//SetEntProp(wpnid, Prop_Send, "m_hPrevOwner", -1);
+	//if(!StrEqual(bit[1], "none")) SetEntProp(wpnid, Prop_Send, "m_iWorldDroppedModelIndex", PrecacheModel(bit[1])); 
+	//if(!StrEqual(bit[1], "none")) SetEntPropString(wpnid, Prop_Data, "m_ModelName", bit[1]);
+	//PrintToChatAll("model dado %s", bit[1]);	
+}
+
+public Action:OnPostWeaponEquip(client, weapon)
+{
+	if(weapon < 1 || !IsValidEdict(weapon) || !IsValidEntity(weapon)) return;
+	
+	if (GetEntProp(weapon, Prop_Send, "m_hPrevOwner") > 0)
+		return;
+		
+	decl String:classname[64];
+	if(!GetEdictClassname(weapon, classname, 64)) return;
+	
+	char globalName[64];
+	Entity_GetGlobalName(weapon, globalName, sizeof(globalName));
+	if(StrContains(globalName, "custom", false) == 0)
+	{
+		return;
+	}
+	
 	new model_index;
-	char classname[64];
-	
-	DHookGetParamString(hParams, 1, classname, 64);
-	if(StrContains(classname, "item", false) == 0) return MRES_Ignored;
-	if(StrContains(classname, "ammo", false) == 0) return MRES_Ignored;
-	
-	new weapon = DHookGetReturn(hReturn);
-	if(weapon < 1) return MRES_Ignored;
 	
 	new weaponindex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
 	switch (weaponindex)
@@ -201,24 +211,54 @@ public MRESReturn OnGiveNamedItem(int client, Handle hReturn, Handle hParams)
 		case 64: strcopy(classname, 64, "weapon_revolver");
 	}
 	
-	if(!GetTrieValue(trie_weapons[client], classname, model_index) || model_index == -1) return MRES_Ignored;
+	char classname_world[64];
+	Format(classname_world, sizeof(classname_world), "%s_world", classname);
+	new model_world;
+	if(GetTrieValue(trie_weapons[client], classname_world, model_world) && model_world != -1)
+	{
+		int iWorldModel = GetEntPropEnt(weapon, Prop_Send, "m_hWeaponWorldModel"); 
+		if(IsValidEdict(iWorldModel))
+		{
+			SetEntProp(iWorldModel, Prop_Send, "m_nModelIndex", model_world);
+				
+			if(eco_items && !IsFakeClient(client))
+			{
+				SetEntProp(weapon, Prop_Send, "m_iItemIDLow", 0);
+				SetEntProp(weapon, Prop_Send, "m_iItemIDHigh", 0);
+			}
+		}
+	}
+	
+	char classname_drop[64];
+	Format(classname_drop, sizeof(classname_world), "%s_drop", classname);
+	char model_drop[128];
+	if(GetTrieString(trie_weapons[client], classname_drop, model_drop, 128) && !StrEqual(model_drop, "none"))
+	{
+		if(!IsModelPrecached(model_drop)) PrecacheModel(model_drop);
+		
+		//SetEntProp(weapon, Prop_Send, "m_iWorldDroppedModelIndex", PrecacheModel(model_drop)); 
+		//SetEntPropString(weapon, Prop_Data, "m_ModelName", model_drop);
+		//PrintToChatAll("model dado %s", model_drop);
+		if(eco_items && !IsFakeClient(client))
+		{
+				SetEntProp(weapon, Prop_Send, "m_iItemIDLow", 0);
+				SetEntProp(weapon, Prop_Send, "m_iItemIDHigh", 0);
+		}
+		//Entity_SetModel(weapon, model_drop);
+		
+	
+	}
+	
+	if(!GetTrieValue(trie_weapons[client], classname, model_index) || model_index == -1) return;
 	
 	
-	if(eco_items)
+	if(eco_items && !IsFakeClient(client))
 	{
 		SetEntProp(weapon, Prop_Send, "m_iItemIDLow", 0);
 		SetEntProp(weapon, Prop_Send, "m_iItemIDHigh", 0);
 	}
 	
-	nosir[client] = false;
-	return MRES_Ignored;
-}
-
-public MRESReturn OnGiveNamedItemPre(int client, Handle hReturn, Handle hParams)
-{
-	nosir[client] = true;
-	
-	return MRES_Ignored;
+	Entity_SetGlobalName(weapon, "custom%i;%s", model_index,model_drop);
 }
 
 public void OnClientPutInServer(int client)
@@ -232,46 +272,9 @@ public void OnClientPutInServer(int client)
 	
 	SDKHook(client, SDKHook_WeaponSwitchPost, OnClientWeaponSwitchPost); 
 	SDKHook(client, SDKHook_WeaponSwitch, OnClientWeaponSwitch); 
-	
-	if(eco_items)
-	{
-		DHookEntity(hGiveNamedItem, true, client);
-		DHookEntity(hGiveNamedItem2, false, client);
-		//SDKHook(client, SDKHook_PostThinkPost, OnPostThinkPostKnifeFix);
-		//SDKHook(client, SDKHook_PostThinkPost, OnPostThinkPost);
-	}
+	SDKHook(client, SDKHook_WeaponEquip, OnPostWeaponEquip);
+	SDKHook(client, SDKHook_WeaponDropPost, Hook_WeaponDrop);
 }
-
-/* public OnPostThinkPost(client)
-{
-	if (!IsPlayerAlive(client))
-	{
-        return;
-	}
-	
-	new model_index;
-    
-	if(g_PVMid[client] == -1)
-	{
-		g_PVMid[client] = newWeapon_GetViewModelIndex(client, -1); 
-		if(!IsValidEdict(g_PVMid[client])) return;
-	}
-	
-	new Sequence = GetEntProp(g_PVMid[client], Prop_Send, "m_nSequence");
-	new Float:Cycle = GetEntPropFloat(g_PVMid[client], Prop_Data, "m_flCycle");
-    
-	PrintHintText(client, "secuencia %i", Sequence);
-	
-	if ((Cycle < OldCycle[client]) && (Sequence == OldSequence[client]))
-	{
-		PrintToConsole(client, "FIX = secuencia %i",Sequence);
-		
-		//SetEntProp(g_PVMid[client], Prop_Send, "m_nSequence", Sequence);
-	}
-	
-	OldSequence[client] = Sequence;
-	OldCycle[client] = Cycle;
-} */
 
 public Action PlayerDeath(Handle event, char[] name, bool dontBroadcast)
 {
@@ -279,7 +282,7 @@ public Action PlayerDeath(Handle event, char[] name, bool dontBroadcast)
 	if(hook[client])
 	{
 		//PrintToChat(client, "quitado");
-		SDKUnhook(client, SDKHook_PostThinkPost, OnPostThinkPostKnifeFix);
+		SDKUnhook(client, SDKHook_PostThinkPost, OnPostThinkPostAnimationFix);
 		hook[client] = false;
 	}
 }
@@ -289,7 +292,7 @@ public void OnClientWeaponSwitch(int client, int wpnid)
 	if(hook[client])
 	{
 		//PrintToChat(client, "quitado");
-		SDKUnhook(client, SDKHook_PostThinkPost, OnPostThinkPostKnifeFix);
+		SDKUnhook(client, SDKHook_PostThinkPost, OnPostThinkPostAnimationFix);
 		hook[client] = false;
 	}
 }
@@ -309,26 +312,23 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	
 	if(StrContains(classname, "item", false) == 0) return;
 	
-	new weaponindex = GetEntProp(wpnid, Prop_Send, "m_iItemDefinitionIndex");
-	switch (weaponindex)
-	{
-		case 60: strcopy(classname, 64, "weapon_m4a1_silencer");
-		case 61: strcopy(classname, 64, "weapon_usp_silencer");
-		case 63: strcopy(classname, 64, "weapon_cz75a");
-		case 64: strcopy(classname, 64, "weapon_revolver");
-	}
-	
 	new model_index;
-	
-	if(!GetTrieValue(trie_weapons[client], classname, model_index))
+	char globalName[64];
+	Entity_GetGlobalName(wpnid, globalName, sizeof(globalName));
+	if(StrContains(globalName, "custom", false) != 0)
 	{
 		return;
 	}
 	
-	char classname_default[64], classname_world[64];
-	Format(classname_default, sizeof(classname_default), "%s_default", classname);
-	Format(classname_world, sizeof(classname_world), "%s_world", classname);
+	ReplaceString(globalName, 64, "custom", "");
 	
+	decl String:bit[2][128];
+
+	ExplodeString(globalName, ";", bit, sizeof bit, sizeof bit[]);
+
+	model_index = StringToInt(bit[0]);
+	
+	SetEntProp(wpnid, Prop_Send, "m_nModelIndex", 0); 
 	
 	new clientview = EntRefToEntIndex(g_PVMid[client]);
 	if(clientview == INVALID_ENT_REFERENCE)
@@ -341,47 +341,21 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 		}
 	}
 	
-	if(model_index == -1)
-	{
-		if(!GetTrieValue(trie_weapons[client], classname_default, model_index) || model_index == -1) return;
-		
-		SetEntProp(clientview, Prop_Send, "m_nModelIndex", model_index); 
-		SetTrieValue(trie_weapons[client], classname_default, -1);
-		return;
-	}
-	
- 	if(eco_items && !nosir[client])
-	{
-		if(GetEntProp(wpnid, Prop_Send, "m_iItemIDLow") != 0 || GetEntProp(wpnid, Prop_Send, "m_iItemIDHigh") != 0) 
-		{
-			if(!GetTrieValue(trie_weapons[client], classname_default, model_index) || model_index == -1) return;
-			
-			SetEntProp(clientview, Prop_Send, "m_nModelIndex", model_index); 
-			return;
-			
-		}
-	}
-	
-	SetEntProp(wpnid, Prop_Send, "m_nModelIndex", 0); 
-		
-	new model_world;
-	if(GetTrieValue(trie_weapons[client], classname_world, model_world) && model_world != -1)
-	{
-		int iWorldModel = GetEntPropEnt(wpnid, Prop_Send, "m_hWeaponWorldModel"); 
-		if(IsValidEdict(iWorldModel)) SetEntProp(iWorldModel, Prop_Send, "m_nModelIndex", model_world);
-		
-		//PrintToChat(client, "dado");
-	}
-	
-	int model_index_custom = model_index;
-	
-	if(!GetTrieValue(trie_weapons[client], classname_default, model_index) || model_index == -1) SetTrieValue(trie_weapons[client], classname_default, GetEntProp(clientview, Prop_Send, "m_nModelIndex"));
-	
-	SetEntProp(clientview, Prop_Send, "m_nModelIndex", model_index_custom); 
+	SetEntProp(clientview, Prop_Send, "m_nModelIndex", model_index); 
 	
 	hook[client] = true;
+	
+	new weaponindex = GetEntProp(wpnid, Prop_Send, "m_iItemDefinitionIndex");
+	switch (weaponindex)
+	{
+		case 60: strcopy(classname, 64, "weapon_m4a1_silencer");
+		case 61: strcopy(classname, 64, "weapon_usp_silencer");
+		case 63: strcopy(classname, 64, "weapon_cz75a");
+		case 64: strcopy(classname, 64, "weapon_revolver");
+	}
+	
 	Format(g_classname[client], 64, classname);
-	SDKHook(client, SDKHook_PostThinkPost, OnPostThinkPostKnifeFix);
+	SDKHook(client, SDKHook_PostThinkPost, OnPostThinkPostAnimationFix);
 }
 
 public void OnClientDisconnect(int client)
@@ -430,6 +404,29 @@ public Native_AddWorldWeapon(Handle:plugin, argc)
 	Call_Finish();
 }
 
+public Native_AddDropWeapon(Handle:plugin, argc)
+{  
+	char name[64], drop[64];
+	
+	int client = GetNativeCell(1);
+	GetNativeString(2, name, 64);
+	
+	char model_drop[128]
+	GetNativeString(3, model_drop, 64);
+	
+	
+	Format(drop, 64, "%s_drop", name);
+	SetTrieString(trie_weapons[client], drop, model_drop);
+	
+	RefreshWeapon(client, name);
+	
+	Call_StartForward(OnClientDrop);
+	Call_PushCell(client);
+	Call_PushString(name);
+	Call_PushString(model_drop);
+	Call_Finish();
+}
+
 public int Native_GetWeaponView(Handle:plugin, argc)
 {  
 	char name[64];
@@ -462,18 +459,38 @@ public int Native_GetWeaponWorld(Handle:plugin, argc)
 	return arrayindex;
 }
 
+public void Native_GetWeaponDrop(Handle:plugin, argc)
+{  
+	char name[64];
+	
+	int client = GetNativeCell(1);
+	GetNativeString(2, name, 64);
+	
+	Format(name, 64, "%s_drop", name);
+	char arrayindex[128];
+	if(!GetTrieString(trie_weapons[client], name, arrayindex, 128))
+	{
+		SetNativeString(3, "none", 64);
+	}
+	else SetNativeString(3, arrayindex, 64);
+}
+
 public Native_SetWeapon(Handle:plugin, argc)
 {  
-	char name[64], world[64];
+	char name[64], world[64], drop[64];
 	
 	int client = GetNativeCell(1);
 	GetNativeString(2, name, 64);
 	int model_index = GetNativeCell(3);
 	int model_world = GetNativeCell(4);
+	char model_drop[128];
+	GetNativeString(5, model_drop, 128);
 	Format(world, 64, "%s_world", name);
+	Format(drop, 64, "%s_drop", name);
 	
 	SetTrieValue(trie_weapons[client], name, model_index);
 	SetTrieValue(trie_weapons[client], world, model_world);
+	SetTrieString(trie_weapons[client], drop, model_drop);
 	
 	RefreshWeapon(client, name);
 	
@@ -487,6 +504,12 @@ public Native_SetWeapon(Handle:plugin, argc)
 	Call_PushCell(client);
 	Call_PushString(name);
 	Call_PushCell(model_world);
+	Call_Finish();
+	
+	Call_StartForward(OnClientDrop);
+	Call_PushCell(client);
+	Call_PushString(name);
+	Call_PushString(model_drop);
 	Call_Finish();
 }
 
@@ -527,6 +550,25 @@ public Native_RemoveWorldWeapon(Handle:plugin, argc)
 	Call_Finish();
 }
 
+public Native_RemoveDropWeapon(Handle:plugin, argc)
+{  
+	char name[64], drop[64];
+	
+	int client = GetNativeCell(1);
+	GetNativeString(2, name, 64);
+	
+	Format(drop, 64, "%s_drop", name);
+	SetTrieString(trie_weapons[client], drop, "none");
+	
+	RefreshWeapon(client, name);
+	
+	Call_StartForward(OnClientDrop);
+	Call_PushCell(client);
+	Call_PushString(name);
+	Call_PushString("none");
+	Call_Finish();
+}
+
 RefreshWeapon(client, char[] name)
 {
 	if(!IsPlayerAlive(client)) return;
@@ -557,8 +599,6 @@ RefreshWeapon(client, char[] name)
 			else weapon = GivePlayerItem(client, name);
 			
 		} else weapon = GivePlayerItem(client, name);
-		//if(StrEqual(name, "weapon_knife")) EquipPlayerWeapon(client, weapon);
-		//PrintToChat(client, "falso custom");
 
  		if(ammo1 > -1) Weapon_SetPrimaryAmmoCount(weapon, ammo1);
 		if(ammo2 > -1) Weapon_SetSecondaryAmmoCount(weapon, ammo2);

@@ -26,6 +26,16 @@ native FPVMI_AddViewModelToClient(int client, char[] weapon, int weaponview_inde
 native FPVMI_AddWorldModelToClient(int client, char[] weapon, int weaponworld_index=-1);
 
 /**
+ * Add a custom drop model to a weapon
+ *
+ * @param client     Player for check
+ * @String weapon     Weapon to replace
+ * @String dropmodel    The weapon model
+ * @return no return
+ */
+native FPVMI_AddDropModelToClient(int client, char[] weapon, char[] dropmodel="none");
+
+/**
  * Return the custom world model index of a client
  *
  * @param client     Player for check
@@ -44,6 +54,15 @@ native int FPVMI_GetClientWorldModel(int client, char[] weapon);
 native int FPVMI_GetClientViewModel(int client, char[] weapon);
 
 /**
+ * Return the custom drop model index of a client
+ *
+ * @param client     Player for check
+ * @String weapon     Weapon to search
+ * @String drop     copy the dropmodel string
+ */
+native FPVMI_GetClientDropModel(int client, char[] weapon, char[] dropmodel);
+
+/**
  * Set a custom view/world model to a weapon
  *
  * @param client     Player for check
@@ -52,7 +71,7 @@ native int FPVMI_GetClientViewModel(int client, char[] weapon);
  * @param weaponwold_index    The weapon precached index with the view model. -1 = default model
  * @return no return
  */
-native FPVMI_SetClientModel(int client, char[] weapon, int weaponview_index=-1, int weaponworld_index=-1);
+native FPVMI_SetClientModel(int client, char[] weapon, int weaponview_index=-1, int weaponworld_index=-1, char[] dropmodel="none");
 
 /**
  * Remove a custom view model to a weapon
@@ -73,6 +92,15 @@ native FPVMI_RemoveViewModelToClient(int client, char[] weapon);
 native FPVMI_RemoveWorldModelToClient(int client, char[] weapon);
 
 /**
+ * Remove a custom drop model to a weapon
+ *
+ * @param client     Player for check
+ * @String weapon     Weapon to replace
+ * @return no return
+ */
+native FPVMI_RemoveDropModelToClient(int client, char[] weapon);
+
+/**
  * Called when a View model has been set.
  *
  * @param client            Client.
@@ -89,3 +117,12 @@ forward FPVMI_OnClientViewModel(client, const String:weapon[], weapon_index);
  * @param weaponworld_index     The weapon precached index 
  */
 forward FPVMI_OnClientWorldModel(client, const String:weapon[], weaponworld_index);
+
+/**
+ * Called when a drop model has been set.
+ *
+ * @param client            Client.
+ * @String weapon     Weapon
+ * @String dropmodel     The weapon dropmodel
+ */
+forward FPVMI_OnClientDropModel(client, const String:weapon[], char[] dropmodel);

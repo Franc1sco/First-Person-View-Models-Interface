@@ -4,11 +4,9 @@
 #include <smlib>
 
 
-#define DATA "3.0"
+#define DATA "3.1"
 
 Handle trie_weapons[MAXPLAYERS+1];
-
-bool eco_items = false;
 
 int g_PVMid[MAXPLAYERS+1];
 
@@ -32,7 +30,6 @@ public Plugin myinfo =
 
 public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 {
-	if(GetEngineVersion() == Engine_CSGO || GetEngineVersion() == Engine_TF2) eco_items = true;
 	
 	CreateNative("FPVMI_AddViewModelToClient", Native_AddViewWeapon);
 	CreateNative("FPVMI_AddWorldModelToClient", Native_AddWorldWeapon);
@@ -221,11 +218,6 @@ public Action:OnPostWeaponEquip(client, weapon)
 		{
 			SetEntProp(iWorldModel, Prop_Send, "m_nModelIndex", model_world);
 				
-			if(eco_items && !IsFakeClient(client))
-			{
-				SetEntProp(weapon, Prop_Send, "m_iItemIDLow", 0);
-				SetEntProp(weapon, Prop_Send, "m_iItemIDHigh", 0);
-			}
 		}
 	}
 	
@@ -239,11 +231,6 @@ public Action:OnPostWeaponEquip(client, weapon)
 		//SetEntProp(weapon, Prop_Send, "m_iWorldDroppedModelIndex", PrecacheModel(model_drop)); 
 		//SetEntPropString(weapon, Prop_Data, "m_ModelName", model_drop);
 		//PrintToChatAll("model dado %s", model_drop);
-		if(eco_items && !IsFakeClient(client))
-		{
-				SetEntProp(weapon, Prop_Send, "m_iItemIDLow", 0);
-				SetEntProp(weapon, Prop_Send, "m_iItemIDHigh", 0);
-		}
 		//Entity_SetModel(weapon, model_drop);
 		
 	
@@ -251,12 +238,6 @@ public Action:OnPostWeaponEquip(client, weapon)
 	
 	if(!GetTrieValue(trie_weapons[client], classname, model_index) || model_index == -1) return;
 	
-	
-	if(eco_items && !IsFakeClient(client))
-	{
-		SetEntProp(weapon, Prop_Send, "m_iItemIDLow", 0);
-		SetEntProp(weapon, Prop_Send, "m_iItemIDHigh", 0);
-	}
 	
 	Entity_SetGlobalName(weapon, "custom%i;%s", model_index,model_drop);
 }

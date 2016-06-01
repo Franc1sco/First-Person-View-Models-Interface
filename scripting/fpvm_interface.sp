@@ -137,6 +137,18 @@ public OnPostThinkPostAnimationFix(client)
 				}	
 			}
 		}
+		else if(StrEqual(g_classname[client], "weapon_deagle"))
+		{
+			switch (Sequence)
+			{
+				case 3:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 2);
+				case 2:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 1);
+				case 1:
+					SetEntProp(clientview, Prop_Send, "m_nSequence", 3);	
+			}
+		}
 		//SetEntProp(clientview, Prop_Send, "m_nSequence", Sequence);
 	}
 	

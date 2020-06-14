@@ -21,7 +21,7 @@
 #include <smlib>
 
 
-#define DATA "3.1"
+#define DATA "3.2"
 
 Handle trie_weapons[MAXPLAYERS+1];
 
@@ -71,7 +71,7 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 
 public void OnPluginStart()
 {
-	CreateConVar("sm_fpvmi_version", DATA, "", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
+	CreateConVar("sm_fpvmi_version", DATA, "", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
 	
 	HookEvent("player_death", PlayerDeath, EventHookMode_Pre);
 	
@@ -187,7 +187,7 @@ public Action SetWorldModel(Handle tmr, any ref)
 {
 	new wpnid = EntRefToEntIndex(ref);
 	
-	if(wpnid == INVALID_ENT_REFERENCE) return;
+	if(wpnid == INVALID_ENT_REFERENCE || !IsValidEntity(wpnid) || !IsValidEdict(wpnid)) return;
 	
 	char globalName[64];
 	Entity_GetGlobalName(wpnid, globalName, sizeof(globalName));
@@ -202,7 +202,7 @@ public Action SetWorldModel(Handle tmr, any ref)
 
 	ExplodeString(globalName, ";", bit, sizeof bit, sizeof bit[]);
 
-	if(!StrEqual(bit[1], "none")) SetEntityModel(wpnid, bit[1]);
+	if(!StrEqual(bit[1], "none") && strlen(bit[1]) > 2 && FileExists(bit[1]) && IsModelPrecached(bit[1])) SetEntityModel(wpnid, bit[1]);
 	//SetEntProp(wpnid, Prop_Send, "m_hPrevOwner", -1);
 	//if(!StrEqual(bit[1], "none")) SetEntProp(wpnid, Prop_Send, "m_iWorldDroppedModelIndex", PrecacheModel(bit[1])); 
 	//if(!StrEqual(bit[1], "none")) SetEntPropString(wpnid, Prop_Data, "m_ModelName", bit[1]);
@@ -382,6 +382,10 @@ public Native_AddViewWeapon(Handle:plugin, argc)
 	int client = GetNativeCell(1);
 	GetNativeString(2, name, 64);
 	int model_index = GetNativeCell(3);
+	
+	if(trie_weapons[client] == INVALID_HANDLE)
+		trie_weapons[client] = CreateTrie();
+		
 	SetTrieValue(trie_weapons[client], name, model_index);
 
 	RefreshWeapon(client, name);
@@ -403,6 +407,10 @@ public Native_AddWorldWeapon(Handle:plugin, argc)
 	
 	
 	Format(world, 64, "%s_world", name);
+	
+	if(trie_weapons[client] == INVALID_HANDLE)
+		trie_weapons[client] = CreateTrie();
+	
 	SetTrieValue(trie_weapons[client], world, model_world);
 	
 	RefreshWeapon(client, name);
@@ -426,6 +434,10 @@ public Native_AddDropWeapon(Handle:plugin, argc)
 	
 	
 	Format(drop, 64, "%s_drop", name);
+	
+	if(trie_weapons[client] == INVALID_HANDLE)
+		trie_weapons[client] = CreateTrie();
+	
 	SetTrieString(trie_weapons[client], drop, model_drop);
 	
 	RefreshWeapon(client, name);
@@ -444,6 +456,9 @@ public int Native_GetWeaponView(Handle:plugin, argc)
 	int client = GetNativeCell(1);
 	GetNativeString(2, name, 64);
 	
+	if(trie_weapons[client] == INVALID_HANDLE)
+		trie_weapons[client] = CreateTrie();
+	
 	int arrayindex;
 	if(!GetTrieValue(trie_weapons[client], name, arrayindex) || arrayindex == -1)
 	{
@@ -461,6 +476,10 @@ public int Native_GetWeaponWorld(Handle:plugin, argc)
 	GetNativeString(2, name, 64);
 	Format(name, 64, "%s_world", name);
 	int arrayindex;
+	
+	if(trie_weapons[client] == INVALID_HANDLE)
+		trie_weapons[client] = CreateTrie();
+	
 	if(!GetTrieValue(trie_weapons[client], name, arrayindex) || arrayindex == -1)
 	{
 		return -1;
@@ -478,6 +497,10 @@ public void Native_GetWeaponDrop(Handle:plugin, argc)
 	
 	Format(name, 64, "%s_drop", name);
 	char arrayindex[128];
+	
+	if(trie_weapons[client] == INVALID_HANDLE)
+		trie_weapons[client] = CreateTrie();
+	
 	if(!GetTrieString(trie_weapons[client], name, arrayindex, 128))
 	{
 		SetNativeString(3, "none", 64);
@@ -497,6 +520,9 @@ public Native_SetWeapon(Handle:plugin, argc)
 	GetNativeString(5, model_drop, 128);
 	Format(world, 64, "%s_world", name);
 	Format(drop, 64, "%s_drop", name);
+	
+	if(trie_weapons[client] == INVALID_HANDLE)
+		trie_weapons[client] = CreateTrie();
 	
 	SetTrieValue(trie_weapons[client], name, model_index);
 	SetTrieValue(trie_weapons[client], world, model_world);
@@ -530,7 +556,9 @@ public Native_RemoveViewWeapon(Handle:plugin, argc)
 	
 	int client = GetNativeCell(1);
 	GetNativeString(2, name, 64);
-	SetTrieValue(trie_weapons[client], name, -1);
+	
+	if(trie_weapons[client] != INVALID_HANDLE)
+		SetTrieValue(trie_weapons[client], name, -1);
 	
 	RefreshWeapon(client, name);
 	
@@ -549,7 +577,8 @@ public Native_RemoveWorldWeapon(Handle:plugin, argc)
 	GetNativeString(2, name, 64);
 	
 	Format(world, 64, "%s_world", name);
-	SetTrieValue(trie_weapons[client], world, -1);
+	if(trie_weapons[client] != INVALID_HANDLE)
+		SetTrieValue(trie_weapons[client], world, -1);
 	
 	RefreshWeapon(client, name);
 	
@@ -568,7 +597,8 @@ public Native_RemoveDropWeapon(Handle:plugin, argc)
 	GetNativeString(2, name, 64);
 	
 	Format(drop, 64, "%s_drop", name);
-	SetTrieString(trie_weapons[client], drop, "none");
+	if(trie_weapons[client] != INVALID_HANDLE)
+		SetTrieString(trie_weapons[client], drop, "none");
 	
 	RefreshWeapon(client, name);
 	

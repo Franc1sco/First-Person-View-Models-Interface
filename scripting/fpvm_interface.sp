@@ -20,21 +20,22 @@
 #include <sdkhooks>
 #include <smlib>
 
+#pragma newdecls required
 
 #define DATA "3.2"
 
-Handle trie_weapons[MAXPLAYERS+1];
+enum struct variables {
+	Handle trie_weapons;
+	int g_PVMid;
+	int OldSequence;
+	float OldCycle;
+	char g_classname;
+	bool hook;
+}
 
-int g_PVMid[MAXPLAYERS+1];
+variables fpvmi[MAXPLAYERS + 1];
 
 Handle OnClientView, OnClientWorld, OnClientDrop;
-
-new OldSequence[MAXPLAYERS+1];
-new Float:OldCycle[MAXPLAYERS+1];
-
-char g_classname[MAXPLAYERS+1][64];
-
-bool hook[MAXPLAYERS+1];
 
 public Plugin myinfo = 
 {
@@ -45,7 +46,7 @@ public Plugin myinfo =
 	url = "http://steamcommunity.com/id/franug"
 };
 
-public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
 	
 	CreateNative("FPVMI_AddViewModelToClient", Native_AddViewWeapon);
@@ -77,27 +78,25 @@ public void OnPluginStart()
 	
 	for(int i = 1; i <= MaxClients; i++)
 		if(IsClientInGame(i))
-		{
 			OnClientPutInServer(i);
-		}
 }
 
-public OnPostThinkPostAnimationFix(client)
+public void OnPostThinkPostAnimationFix(int client)
 {
-	new clientview = EntRefToEntIndex(g_PVMid[client]);
+	int clientview = EntRefToEntIndex(fpvmi[client].g_PVMid);
 	if(clientview == INVALID_ENT_REFERENCE)
 	{
 		SDKUnhook(client, SDKHook_PostThinkPost, OnPostThinkPostAnimationFix);
 		//PrintToChat(client, "quitado");
-		hook[client] = false;
+		fpvmi[client].hook = false;
 		return;
 	}
 	
-	new Sequence = GetEntProp(clientview, Prop_Send, "m_nSequence");
-	new Float:Cycle = GetEntPropFloat(clientview, Prop_Data, "m_flCycle");
-	if ((Cycle < OldCycle[client]) && (Sequence == OldSequence[client]))
+	int Sequence = GetEntProp(clientview, Prop_Send, "m_nSequence");
+	float Cycle = GetEntPropFloat(clientview, Prop_Data, "m_flCycle");
+	if ((Cycle < fpvmi[client].OldCycle) && (Sequence == fpvmi[client].OldSequence))
 	{
-		if(StrEqual(g_classname[client], "weapon_knife"))
+		if(StrEqual(fpvmi[client].g_classname, "weapon_knife"))
 		{
 			//PrintToConsole(client, "FIX = secuencia %i",Sequence);
 			switch (Sequence)
@@ -122,7 +121,7 @@ public OnPostThinkPostAnimationFix(client)
 					SetEntProp(clientview, Prop_Send, "m_nSequence", 10);
 			}
 		}
-		else if(StrEqual(g_classname[client], "weapon_ak47"))
+		else if(StrEqual(fpvmi[client].g_classname, "weapon_ak47"))
 		{
 			switch (Sequence)
 			{
@@ -134,7 +133,7 @@ public OnPostThinkPostAnimationFix(client)
 					SetEntProp(clientview, Prop_Send, "m_nSequence", 3);			
 			}
 		}
-		else if(StrEqual(g_classname[client], "weapon_mp7"))
+		else if(StrEqual(fpvmi[client].g_classname, "weapon_mp7"))
 		{
 			switch (Sequence)
 			{
@@ -144,7 +143,7 @@ public OnPostThinkPostAnimationFix(client)
 				}
 			}
 		}
-		else if(StrEqual(g_classname[client], "weapon_awp"))
+		else if(StrEqual(fpvmi[client].g_classname, "weapon_awp"))
 		{
 			switch (Sequence)
 			{
@@ -154,7 +153,7 @@ public OnPostThinkPostAnimationFix(client)
 				}	
 			}
 		}
-		else if(StrEqual(g_classname[client], "weapon_deagle"))
+		else if(StrEqual(fpvmi[client].g_classname, "weapon_deagle"))
 		{
 			switch (Sequence)
 			{
@@ -169,8 +168,8 @@ public OnPostThinkPostAnimationFix(client)
 		//SetEntProp(clientview, Prop_Send, "m_nSequence", Sequence);
 	}
 	
-	OldSequence[client] = Sequence;
-	OldCycle[client] = Cycle;
+	fpvmi[client].OldSequence = Sequence;
+	fpvmi[client].OldCycle = Cycle;
 }
 
 public Action Hook_WeaponDrop(int client, int wpnid)
@@ -185,38 +184,33 @@ public Action Hook_WeaponDrop(int client, int wpnid)
 
 public Action SetWorldModel(Handle tmr, any ref)
 {
-	new wpnid = EntRefToEntIndex(ref);
+	int wpnid = EntRefToEntIndex(ref);
 	
 	if(wpnid == INVALID_ENT_REFERENCE || !IsValidEntity(wpnid) || !IsValidEdict(wpnid)) return;
 	
 	char globalName[64];
 	Entity_GetGlobalName(wpnid, globalName, sizeof(globalName));
 	if(StrContains(globalName, "custom", false) != 0)
-	{
 		return;
-	}
 	
 	ReplaceString(globalName, 64, "custom", "");
 
-	decl String:bit[2][128];
+	char bit[2][128];
 
 	ExplodeString(globalName, ";", bit, sizeof bit, sizeof bit[]);
 
-	if(!StrEqual(bit[1], "none") && strlen(bit[1]) > 2 && FileExists(bit[1]) && IsModelPrecached(bit[1])) SetEntityModel(wpnid, bit[1]);
-	//SetEntProp(wpnid, Prop_Send, "m_hPrevOwner", -1);
-	//if(!StrEqual(bit[1], "none")) SetEntProp(wpnid, Prop_Send, "m_iWorldDroppedModelIndex", PrecacheModel(bit[1])); 
-	//if(!StrEqual(bit[1], "none")) SetEntPropString(wpnid, Prop_Data, "m_ModelName", bit[1]);
-	//PrintToChatAll("model dado %s", bit[1]);	
+	if(!StrEqual(bit[1], "none") && strlen(bit[1]) > 2 && FileExists(bit[1]) && IsModelPrecached(bit[1])) 
+		SetEntityModel(wpnid, bit[1]);
 }
 
-public Action:OnPostWeaponEquip(client, weapon)
+public Action OnPostWeaponEquip(int client, int weapon)
 {
 	if(weapon < 1 || !IsValidEdict(weapon) || !IsValidEntity(weapon)) return;
 	
 	if (GetEntProp(weapon, Prop_Send, "m_hPrevOwner") > 0)
 		return;
 		
-	decl String:classname[64];
+	char classname[64];
 	if(!GetEdictClassname(weapon, classname, 64)) return;
 	
 	char globalName[64];
@@ -226,9 +220,9 @@ public Action:OnPostWeaponEquip(client, weapon)
 		return;
 	}
 	
-	new model_index;
+	int model_index;
 	
-	new weaponindex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
+	int weaponindex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
 	switch (weaponindex)
 	{
 		case 60: strcopy(classname, 64, "weapon_m4a1_silencer");
@@ -239,8 +233,8 @@ public Action:OnPostWeaponEquip(client, weapon)
 	
 	char classname_world[64];
 	Format(classname_world, sizeof(classname_world), "%s_world", classname);
-	new model_world;
-	if(GetTrieValue(trie_weapons[client], classname_world, model_world) && model_world != -1)
+	int model_world;
+	if(GetTrieValue(fpvmi[client].trie_weapons, classname_world, model_world) && model_world != -1)
 	{
 		int iWorldModel = GetEntPropEnt(weapon, Prop_Send, "m_hWeaponWorldModel"); 
 		if(IsValidEdict(iWorldModel))
@@ -253,7 +247,7 @@ public Action:OnPostWeaponEquip(client, weapon)
 	char classname_drop[64];
 	Format(classname_drop, sizeof(classname_world), "%s_drop", classname);
 	char model_drop[128];
-	if(GetTrieString(trie_weapons[client], classname_drop, model_drop, 128) && !StrEqual(model_drop, "none"))
+	if(GetTrieString(fpvmi[client].trie_weapons, classname_drop, model_drop, 128) && !StrEqual(model_drop, "none"))
 	{
 		if(!IsModelPrecached(model_drop)) PrecacheModel(model_drop);
 		
@@ -265,7 +259,7 @@ public Action:OnPostWeaponEquip(client, weapon)
 	
 	}
 	
-	if(!GetTrieValue(trie_weapons[client], classname, model_index) || model_index == -1) return;
+	if(!GetTrieValue(fpvmi[client].trie_weapons, classname, model_index) || model_index == -1) return;
 	
 	
 	Entity_SetGlobalName(weapon, "custom%i;%s", model_index,model_drop);
@@ -275,10 +269,10 @@ public void OnClientPutInServer(int client)
 {
 	//if(IsFakeClient(client)) return;
 	
-	g_PVMid[client] = INVALID_ENT_REFERENCE;
-	hook[client] = false;
+	fpvmi[client].g_PVMid = INVALID_ENT_REFERENCE;
+	fpvmi[client].hook = false;
 	
-	trie_weapons[client] = CreateTrie();
+	fpvmi[client].trie_weapons = CreateTrie();
 	
 	SDKHook(client, SDKHook_WeaponSwitchPost, OnClientWeaponSwitchPost); 
 	SDKHook(client, SDKHook_WeaponSwitch, OnClientWeaponSwitch); 
@@ -286,24 +280,24 @@ public void OnClientPutInServer(int client)
 	SDKHook(client, SDKHook_WeaponDropPost, Hook_WeaponDrop);
 }
 
-public Action PlayerDeath(Handle event, char[] name, bool dontBroadcast)
+public Action PlayerDeath(Event event, char[] name, bool dontBroadcast)
 {
-	int client = GetClientOfUserId(GetEventInt(event, "userid"));
-	if(hook[client])
+	int client = GetClientOfUserId(event.GetInt("userid"));
+	if(fpvmi[client].hook)
 	{
 		//PrintToChat(client, "quitado");
 		SDKUnhook(client, SDKHook_PostThinkPost, OnPostThinkPostAnimationFix);
-		hook[client] = false;
+		fpvmi[client].hook = false;
 	}
 }
 
 public void OnClientWeaponSwitch(int client, int wpnid) 
 { 
-	if(hook[client])
+	if(fpvmi[client].hook)
 	{
 		//PrintToChat(client, "quitado");
 		SDKUnhook(client, SDKHook_PostThinkPost, OnPostThinkPostAnimationFix);
-		hook[client] = false;
+		fpvmi[client].hook = false;
 	}
 }
 
@@ -322,7 +316,7 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	
 	if(StrContains(classname, "item", false) == 0) return;
 	
-	new model_index;
+	int model_index;
 	char globalName[64];
 	Entity_GetGlobalName(wpnid, globalName, sizeof(globalName));
 	if(StrContains(globalName, "custom", false) != 0)
@@ -332,7 +326,7 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	
 	ReplaceString(globalName, 64, "custom", "");
 	
-	decl String:bit[2][128];
+	char bit[2][128];
 
 	ExplodeString(globalName, ";", bit, sizeof bit, sizeof bit[]);
 
@@ -340,11 +334,11 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	
 	SetEntProp(wpnid, Prop_Send, "m_nModelIndex", 0); 
 	
-	new clientview = EntRefToEntIndex(g_PVMid[client]);
+	int clientview = EntRefToEntIndex(fpvmi[client].g_PVMid);
 	if(clientview == INVALID_ENT_REFERENCE)
 	{
-		g_PVMid[client] = newWeapon_GetViewModelIndex(client, -1); 
-		clientview = EntRefToEntIndex(g_PVMid[client]);
+		fpvmi[client].g_PVMid = newWeapon_GetViewModelIndex(client, -1); 
+		clientview = EntRefToEntIndex(fpvmi[client].g_PVMid);
 		if(clientview == INVALID_ENT_REFERENCE) 
 		{
 			return;
@@ -353,9 +347,9 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 	
 	SetEntProp(clientview, Prop_Send, "m_nModelIndex", model_index); 
 	
-	hook[client] = true;
+	fpvmi[client].hook = true;
 	
-	new weaponindex = GetEntProp(wpnid, Prop_Send, "m_iItemDefinitionIndex");
+	int weaponindex = GetEntProp(wpnid, Prop_Send, "m_iItemDefinitionIndex");
 	switch (weaponindex)
 	{
 		case 60: strcopy(classname, 64, "weapon_m4a1_silencer");
@@ -364,18 +358,18 @@ public void OnClientWeaponSwitchPost(int client, int wpnid)
 		case 64: strcopy(classname, 64, "weapon_revolver");
 	}
 	
-	Format(g_classname[client], 64, classname);
+	Format(fpvmi[client].g_classname, 64, classname);
 	SDKHook(client, SDKHook_PostThinkPost, OnPostThinkPostAnimationFix);
 }
 
 public void OnClientDisconnect(int client)
 {
-	if(trie_weapons[client] != INVALID_HANDLE) CloseHandle(trie_weapons[client]);
+	if(fpvmi[client].trie_weapons != INVALID_HANDLE) CloseHandle(fpvmi[client].trie_weapons);
 	
-	trie_weapons[client] = INVALID_HANDLE;
+	fpvmi[client].trie_weapons = INVALID_HANDLE;
 }
 
-public Native_AddViewWeapon(Handle:plugin, argc)
+public int Native_AddViewWeapon(Handle plugin, int argc)
 {  
 	char name[64];
 	
@@ -383,10 +377,10 @@ public Native_AddViewWeapon(Handle:plugin, argc)
 	GetNativeString(2, name, 64);
 	int model_index = GetNativeCell(3);
 	
-	if(trie_weapons[client] == INVALID_HANDLE)
-		trie_weapons[client] = CreateTrie();
+	if(fpvmi[client].trie_weapons == INVALID_HANDLE)
+		fpvmi[client].trie_weapons = CreateTrie();
 		
-	SetTrieValue(trie_weapons[client], name, model_index);
+	SetTrieValue(fpvmi[client].trie_weapons, name, model_index);
 
 	RefreshWeapon(client, name);
 	
@@ -397,7 +391,7 @@ public Native_AddViewWeapon(Handle:plugin, argc)
 	Call_Finish();
 }
 
-public Native_AddWorldWeapon(Handle:plugin, argc)
+public int Native_AddWorldWeapon(Handle plugin, int argc)
 {  
 	char name[64], world[64];
 	
@@ -408,10 +402,10 @@ public Native_AddWorldWeapon(Handle:plugin, argc)
 	
 	Format(world, 64, "%s_world", name);
 	
-	if(trie_weapons[client] == INVALID_HANDLE)
-		trie_weapons[client] = CreateTrie();
+	if(fpvmi[client].trie_weapons == INVALID_HANDLE)
+		fpvmi[client].trie_weapons = CreateTrie();
 	
-	SetTrieValue(trie_weapons[client], world, model_world);
+	SetTrieValue(fpvmi[client].trie_weapons, world, model_world);
 	
 	RefreshWeapon(client, name);
 	
@@ -422,7 +416,7 @@ public Native_AddWorldWeapon(Handle:plugin, argc)
 	Call_Finish();
 }
 
-public Native_AddDropWeapon(Handle:plugin, argc)
+public int Native_AddDropWeapon(Handle plugin, int argc)
 {  
 	char name[64], drop[64];
 	
@@ -435,10 +429,10 @@ public Native_AddDropWeapon(Handle:plugin, argc)
 	
 	Format(drop, 64, "%s_drop", name);
 	
-	if(trie_weapons[client] == INVALID_HANDLE)
-		trie_weapons[client] = CreateTrie();
+	if(fpvmi[client].trie_weapons == INVALID_HANDLE)
+		fpvmi[client].trie_weapons = CreateTrie();
 	
-	SetTrieString(trie_weapons[client], drop, model_drop);
+	SetTrieString(fpvmi[client].trie_weapons, drop, model_drop);
 	
 	RefreshWeapon(client, name);
 	
@@ -449,18 +443,18 @@ public Native_AddDropWeapon(Handle:plugin, argc)
 	Call_Finish();
 }
 
-public int Native_GetWeaponView(Handle:plugin, argc)
+public int Native_GetWeaponView(Handle plugin, int argc)
 {  
 	char name[64];
 	
 	int client = GetNativeCell(1);
 	GetNativeString(2, name, 64);
 	
-	if(trie_weapons[client] == INVALID_HANDLE)
-		trie_weapons[client] = CreateTrie();
+	if(fpvmi[client].trie_weapons == INVALID_HANDLE)
+		fpvmi[client].trie_weapons = CreateTrie();
 	
 	int arrayindex;
-	if(!GetTrieValue(trie_weapons[client], name, arrayindex) || arrayindex == -1)
+	if(!GetTrieValue(fpvmi[client].trie_weapons, name, arrayindex) || arrayindex == -1)
 	{
 		return -1;
 	}
@@ -468,7 +462,7 @@ public int Native_GetWeaponView(Handle:plugin, argc)
 	return arrayindex;
 }
 
-public int Native_GetWeaponWorld(Handle:plugin, argc)
+public int Native_GetWeaponWorld(Handle plugin, int argc)
 {  
 	char name[64];
 	
@@ -477,10 +471,10 @@ public int Native_GetWeaponWorld(Handle:plugin, argc)
 	Format(name, 64, "%s_world", name);
 	int arrayindex;
 	
-	if(trie_weapons[client] == INVALID_HANDLE)
-		trie_weapons[client] = CreateTrie();
+	if(fpvmi[client].trie_weapons == INVALID_HANDLE)
+		fpvmi[client].trie_weapons = CreateTrie();
 	
-	if(!GetTrieValue(trie_weapons[client], name, arrayindex) || arrayindex == -1)
+	if(!GetTrieValue(fpvmi[client].trie_weapons, name, arrayindex) || arrayindex == -1)
 	{
 		return -1;
 	}
@@ -488,7 +482,7 @@ public int Native_GetWeaponWorld(Handle:plugin, argc)
 	return arrayindex;
 }
 
-public void Native_GetWeaponDrop(Handle:plugin, argc)
+public void Native_GetWeaponDrop(Handle plugin, int argc)
 {  
 	char name[64];
 	
@@ -498,17 +492,17 @@ public void Native_GetWeaponDrop(Handle:plugin, argc)
 	Format(name, 64, "%s_drop", name);
 	char arrayindex[128];
 	
-	if(trie_weapons[client] == INVALID_HANDLE)
-		trie_weapons[client] = CreateTrie();
+	if(fpvmi[client].trie_weapons == INVALID_HANDLE)
+		fpvmi[client].trie_weapons = CreateTrie();
 	
-	if(!GetTrieString(trie_weapons[client], name, arrayindex, 128))
+	if(!GetTrieString(fpvmi[client].trie_weapons, name, arrayindex, 128))
 	{
 		SetNativeString(3, "none", 64);
 	}
 	else SetNativeString(3, arrayindex, 64);
 }
 
-public Native_SetWeapon(Handle:plugin, argc)
+public int Native_SetWeapon(Handle plugin, int argc)
 {  
 	char name[64], world[64], drop[64];
 	
@@ -521,12 +515,12 @@ public Native_SetWeapon(Handle:plugin, argc)
 	Format(world, 64, "%s_world", name);
 	Format(drop, 64, "%s_drop", name);
 	
-	if(trie_weapons[client] == INVALID_HANDLE)
-		trie_weapons[client] = CreateTrie();
+	if(fpvmi[client].trie_weapons == INVALID_HANDLE)
+		fpvmi[client].trie_weapons = CreateTrie();
 	
-	SetTrieValue(trie_weapons[client], name, model_index);
-	SetTrieValue(trie_weapons[client], world, model_world);
-	SetTrieString(trie_weapons[client], drop, model_drop);
+	SetTrieValue(fpvmi[client].trie_weapons, name, model_index);
+	SetTrieValue(fpvmi[client].trie_weapons, world, model_world);
+	SetTrieString(fpvmi[client].trie_weapons, drop, model_drop);
 	
 	RefreshWeapon(client, name);
 	
@@ -550,15 +544,15 @@ public Native_SetWeapon(Handle:plugin, argc)
 }
 
 
-public Native_RemoveViewWeapon(Handle:plugin, argc)
+public int Native_RemoveViewWeapon(Handle plugin, int argc)
 {  
 	char name[64];
 	
 	int client = GetNativeCell(1);
 	GetNativeString(2, name, 64);
 	
-	if(trie_weapons[client] != INVALID_HANDLE)
-		SetTrieValue(trie_weapons[client], name, -1);
+	if(fpvmi[client].trie_weapons != INVALID_HANDLE)
+		SetTrieValue(fpvmi[client].trie_weapons, name, -1);
 	
 	RefreshWeapon(client, name);
 	
@@ -569,7 +563,7 @@ public Native_RemoveViewWeapon(Handle:plugin, argc)
 	Call_Finish();
 }
 
-public Native_RemoveWorldWeapon(Handle:plugin, argc)
+public int Native_RemoveWorldWeapon(Handle plugin, int argc)
 {  
 	char name[64], world[64];
 	
@@ -577,8 +571,8 @@ public Native_RemoveWorldWeapon(Handle:plugin, argc)
 	GetNativeString(2, name, 64);
 	
 	Format(world, 64, "%s_world", name);
-	if(trie_weapons[client] != INVALID_HANDLE)
-		SetTrieValue(trie_weapons[client], world, -1);
+	if(fpvmi[client].trie_weapons != INVALID_HANDLE)
+		SetTrieValue(fpvmi[client].trie_weapons, world, -1);
 	
 	RefreshWeapon(client, name);
 	
@@ -589,7 +583,7 @@ public Native_RemoveWorldWeapon(Handle:plugin, argc)
 	Call_Finish();
 }
 
-public Native_RemoveDropWeapon(Handle:plugin, argc)
+public int Native_RemoveDropWeapon(Handle plugin, int argc)
 {  
 	char name[64], drop[64];
 	
@@ -597,8 +591,8 @@ public Native_RemoveDropWeapon(Handle:plugin, argc)
 	GetNativeString(2, name, 64);
 	
 	Format(drop, 64, "%s_drop", name);
-	if(trie_weapons[client] != INVALID_HANDLE)
-		SetTrieString(trie_weapons[client], drop, "none");
+	if(fpvmi[client].trie_weapons != INVALID_HANDLE)
+		SetTrieString(fpvmi[client].trie_weapons, drop, "none");
 	
 	RefreshWeapon(client, name);
 	
@@ -609,19 +603,18 @@ public Native_RemoveDropWeapon(Handle:plugin, argc)
 	Call_Finish();
 }
 
-RefreshWeapon(client, char[] name)
+void RefreshWeapon(int client, char[] name)
 {
 	if(!IsPlayerAlive(client)) return;
-	
-	
-	new weapon = Client_GetWeapon(client, name);
+		
+	int weapon = Client_GetWeapon(client, name);
 	
 	if(weapon != INVALID_ENT_REFERENCE)
 	{
-		new ammo1 = Weapon_GetPrimaryAmmoCount(weapon);
-		new ammo2 = Weapon_GetSecondaryAmmoCount(weapon);
-		new clip1 = Weapon_GetPrimaryClip(weapon);
-		new clip2 = Weapon_GetSecondaryClip(weapon);
+		int ammo1 = Weapon_GetPrimaryAmmoCount(weapon);
+		int ammo2 = Weapon_GetSecondaryAmmoCount(weapon);
+		int clip1 = Weapon_GetPrimaryClip(weapon);
+		int clip2 = Weapon_GetSecondaryClip(weapon);
 		
 		RemovePlayerItem(client, weapon);
 		AcceptEntityInput(weapon, "Kill");

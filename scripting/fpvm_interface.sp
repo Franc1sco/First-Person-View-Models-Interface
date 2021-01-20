@@ -1,6 +1,6 @@
 /*  SM First Person View Models Interface
  *
- *  Copyright (C) 2017 Francisco 'Franc1sco' García
+ *  Copyright (C) 2017-2021 Francisco 'Franc1sco' García
  * 
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -22,7 +22,7 @@
 
 #pragma newdecls required
 
-#define DATA "3.2"
+#define DATA "3.3"
 
 enum struct variables {
 	Handle trie_weapons;

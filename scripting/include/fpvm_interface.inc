@@ -11,7 +11,7 @@
  * @param client     Player for check
  * @String weapon     Weapon to replace
  * @param weaponview_index     The weapon precached index with the view model.
- * @return no return
+ * @noreturn
  */
 native void FPVMI_AddViewModelToClient(int client, char[] weapon, int weaponview_index=-1);
 
@@ -21,7 +21,7 @@ native void FPVMI_AddViewModelToClient(int client, char[] weapon, int weaponview
  * @param client     Player for check
  * @String weapon     Weapon to replace
  * @param weaponwold_index    The weapon precached index with the view model. -1 = default model
- * @return no return
+ * @noreturn
  */
 native void FPVMI_AddWorldModelToClient(int client, char[] weapon, int weaponworld_index=-1);
 
@@ -31,7 +31,7 @@ native void FPVMI_AddWorldModelToClient(int client, char[] weapon, int weaponwor
  * @param client     Player for check
  * @String weapon     Weapon to replace
  * @String dropmodel    The weapon model
- * @return no return
+ * @noreturn
  */
 native void FPVMI_AddDropModelToClient(int client, char[] weapon, char[] dropmodel="none");
 
@@ -59,6 +59,7 @@ native int FPVMI_GetClientViewModel(int client, char[] weapon);
  * @param client     Player for check
  * @String weapon     Weapon to search
  * @String drop     copy the dropmodel string
+ * @noreturn
  */
 native void FPVMI_GetClientDropModel(int client, char[] weapon, char[] dropmodel);
 
@@ -68,8 +69,9 @@ native void FPVMI_GetClientDropModel(int client, char[] weapon, char[] dropmodel
  * @param client     Player for check
  * @String weapon     Weapon to replace
  * @param weapon_index     The weapon precached index with the view model. -1 = default model
- * @param weaponwold_index    The weapon precached index with the view model. -1 = default model
- * @return no return
+ * @param weaponworld_index    The weapon precached index with the view model. -1 = default model
+ * @param dropmodel             The weapon drop model
+ * @noreturn
  */
 native void FPVMI_SetClientModel(int client, char[] weapon, int weaponview_index=-1, int weaponworld_index=-1, char[] dropmodel="none");
 
@@ -78,7 +80,7 @@ native void FPVMI_SetClientModel(int client, char[] weapon, int weaponview_index
  *
  * @param client     Player for check
  * @String weapon     Weapon to replace
- * @return no return
+ * @noreturn
  */
 native void FPVMI_RemoveViewModelToClient(int client, char[] weapon);
 
@@ -87,7 +89,7 @@ native void FPVMI_RemoveViewModelToClient(int client, char[] weapon);
  *
  * @param client     Player for check
  * @String weapon     Weapon to replace
- * @return no return
+ * @noreturn
  */
 native void FPVMI_RemoveWorldModelToClient(int client, char[] weapon);
 
@@ -96,7 +98,7 @@ native void FPVMI_RemoveWorldModelToClient(int client, char[] weapon);
  *
  * @param client     Player for check
  * @String weapon     Weapon to replace
- * @return no return
+ * @noreturn
  */
 native void FPVMI_RemoveDropModelToClient(int client, char[] weapon);
 
@@ -105,7 +107,8 @@ native void FPVMI_RemoveDropModelToClient(int client, char[] weapon);
  *
  * @param client            Client.
  * @String weapon     Weapon
- * @param weapon_index     The weapon precached index 
+ * @param weapon_index     The weapon precached index
+ * @noreturn
  */
 forward void FPVMI_OnClientViewModel(int client, const char[] weapon, int weapon_index);
 
@@ -115,6 +118,7 @@ forward void FPVMI_OnClientViewModel(int client, const char[] weapon, int weapon
  * @param client            Client.
  * @String weapon     Weapon
  * @param weaponworld_index     The weapon precached index 
+ * @noreturn
  */
 forward void FPVMI_OnClientWorldModel(int client, const char[] weapon, int weaponworld_index);
 
@@ -124,5 +128,6 @@ forward void FPVMI_OnClientWorldModel(int client, const char[] weapon, int weapo
  * @param client            Client.
  * @String weapon     Weapon
  * @String dropmodel     The weapon dropmodel
+ * @noreturn
  */
 forward void FPVMI_OnClientDropModel(int client, const char[] weapon, char[] dropmodel);

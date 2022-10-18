@@ -114,6 +114,15 @@ native void FPVMI_RemoveWorldModelToClient(int client, char[] weapon);
 native void FPVMI_RemoveDropModelToClient(int client, char[] weapon);
 
 /**
+ * Removed skin from custom weapon model
+ *
+ * @param client     Player for check
+ * @String weapon     Weapon to replace
+ * @noreturn
+ */
+native void FPVMI_RemoveSkinToClient(int client, char[] weapon);
+
+/**
  * Called when a View model has been set.
  *
  * @param client            Client.
@@ -142,3 +151,13 @@ forward void FPVMI_OnClientWorldModel(int client, const char[] weapon, int weapo
  * @noreturn
  */
 forward void FPVMI_OnClientDropModel(int client, const char[] weapon, char[] dropmodel);
+
+/**
+ * Called when a model skin has been set.
+ *
+ * @param client            Client.
+ * @String weapon     Weapon
+ * @String weaponskin_index     skin index
+ * @noreturn
+ */
+forward void FPVMI_OnClientDropModel(int client, const char[] weapon, int weaponskin_index);

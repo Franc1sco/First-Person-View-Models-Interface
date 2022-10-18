@@ -21,13 +21,13 @@
 #include <smlib>
 
 
-#define DATA "3.3"
+#define DATA "3.4"
 
 Handle trie_weapons[MAXPLAYERS+1];
 
 int g_PVMid[MAXPLAYERS+1];
 
-Handle OnClientView, OnClientWorld, OnClientDrop;
+Handle OnClientView, OnClientWorld, OnClientDrop, OnClientSkin;
 
 new OldSequence[MAXPLAYERS+1];
 new Float:OldCycle[MAXPLAYERS+1];
@@ -62,10 +62,12 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	CreateNative("FPVMI_RemoveViewModelToClient", Native_RemoveViewWeapon);
 	CreateNative("FPVMI_RemoveWorldModelToClient", Native_RemoveWorldWeapon);
 	CreateNative("FPVMI_RemoveDropModelToClient", Native_RemoveWorldWeapon);
+	CreateNative("FPVMI_RemoveSkinToClient", Native_RemoveSkin);
 	
 	OnClientView = CreateGlobalForward("FPVMI_OnClientViewModel", ET_Ignore, Param_Cell, Param_String, Param_Cell);
 	OnClientWorld = CreateGlobalForward("FPVMI_OnClientWorldModel", ET_Ignore, Param_Cell, Param_String, Param_Cell);
 	OnClientDrop = CreateGlobalForward("FPVMI_OnClientDropModel", ET_Ignore, Param_Cell, Param_String, Param_String);
+	OnClientSkin = CreateGlobalForward("FPVMI_OnClientSkin", ET_Ignore, Param_Cell, Param_String, Param_Cell);
 	
 	return APLRes_Success;
 }
@@ -484,6 +486,12 @@ public Native_AddSkinWeapon(Handle:plugin, argc)
 	SetTrieValue(trie_weapons[client], skin, model_skin);
 	
 	RefreshWeapon(client, name);
+	
+	Call_StartForward(OnClientSkin);
+	Call_PushCell(client);
+	Call_PushString(name);
+	Call_PushCell(model_skin);
+	Call_Finish();
 }
 
 public int Native_GetWeaponView(Handle:plugin, argc)
@@ -587,6 +595,12 @@ public Native_SetWeapon(Handle:plugin, argc)
 	Call_PushString(name);
 	Call_PushString(model_drop);
 	Call_Finish();
+	
+	Call_StartForward(OnClientSkin);
+	Call_PushCell(client);
+	Call_PushString(name);
+	Call_PushCell(model_skin);
+	Call_Finish();
 }
 
 
@@ -646,6 +660,26 @@ public Native_RemoveDropWeapon(Handle:plugin, argc)
 	Call_PushCell(client);
 	Call_PushString(name);
 	Call_PushString("none");
+	Call_Finish();
+}
+
+public Native_RemoveSkin(Handle:plugin, argc)
+{  
+	char name[64], skin[64];
+	
+	int client = GetNativeCell(1);
+	GetNativeString(2, name, 64);
+	
+	Format(skin, 64, "%s_skin", name);
+	if(trie_weapons[client] != INVALID_HANDLE)
+		SetTrieValue(trie_weapons[client], skin, 0);
+	
+	RefreshWeapon(client, name);
+	
+	Call_StartForward(OnClientSkin);
+	Call_PushCell(client);
+	Call_PushString(name);
+	Call_PushCell(0);
 	Call_Finish();
 }
 

@@ -36,6 +36,16 @@ native void FPVMI_AddWorldModelToClient(int client, char[] weapon, int weaponwor
 native void FPVMI_AddDropModelToClient(int client, char[] weapon, char[] dropmodel="none");
 
 /**
+ * Change skin of a custom model
+ *
+ * @param client     Player for check
+ * @String weapon     Weapon to replace
+ * @param skin    Skin count
+ * @noreturn
+ */
+native void FPVMI_AddSkinToClient(int client, char[] weapon, int skin);
+
+/**
  * Return the custom world model index of a client
  *
  * @param client     Player for check
@@ -71,9 +81,10 @@ native void FPVMI_GetClientDropModel(int client, char[] weapon, char[] dropmodel
  * @param weapon_index     The weapon precached index with the view model. -1 = default model
  * @param weaponworld_index    The weapon precached index with the view model. -1 = default model
  * @param dropmodel             The weapon drop model
+ * @param skin             Skin index of weapon model
  * @noreturn
  */
-native void FPVMI_SetClientModel(int client, char[] weapon, int weaponview_index=-1, int weaponworld_index=-1, char[] dropmodel="none");
+native void FPVMI_SetClientModel(int client, char[] weapon, int weaponview_index=-1, int weaponworld_index=-1, char[] dropmodel="none", int skin = 0);
 
 /**
  * Remove a custom view model to a weapon

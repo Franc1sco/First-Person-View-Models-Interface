@@ -21,13 +21,13 @@
 #include <smlib>
 
 
-#define DATA "3.2"
+#define DATA "3.3"
 
 Handle trie_weapons[MAXPLAYERS+1];
 
 int g_PVMid[MAXPLAYERS+1];
 
-Handle OnClientView, OnClientWorld, OnClientDrop;
+Handle OnClientView, OnClientWorld, OnClientDrop, OnClientSkin;
 
 new OldSequence[MAXPLAYERS+1];
 new Float:OldCycle[MAXPLAYERS+1];
@@ -51,6 +51,7 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	CreateNative("FPVMI_AddViewModelToClient", Native_AddViewWeapon);
 	CreateNative("FPVMI_AddWorldModelToClient", Native_AddWorldWeapon);
 	CreateNative("FPVMI_AddDropModelToClient", Native_AddDropWeapon);
+	CreateNative("FPVMI_AddSkinToClient", Native_AddSkinWeapon);
 	
 	CreateNative("FPVMI_SetClientModel", Native_SetWeapon);
 	
@@ -61,10 +62,12 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	CreateNative("FPVMI_RemoveViewModelToClient", Native_RemoveViewWeapon);
 	CreateNative("FPVMI_RemoveWorldModelToClient", Native_RemoveWorldWeapon);
 	CreateNative("FPVMI_RemoveDropModelToClient", Native_RemoveWorldWeapon);
+	CreateNative("FPVMI_RemoveSkinToClient", Native_RemoveSkin);
 	
 	OnClientView = CreateGlobalForward("FPVMI_OnClientViewModel", ET_Ignore, Param_Cell, Param_String, Param_Cell);
 	OnClientWorld = CreateGlobalForward("FPVMI_OnClientWorldModel", ET_Ignore, Param_Cell, Param_String, Param_Cell);
 	OnClientDrop = CreateGlobalForward("FPVMI_OnClientDropModel", ET_Ignore, Param_Cell, Param_String, Param_String);
+	OnClientSkin = CreateGlobalForward("FPVMI_OnClientSkin", ET_Ignore, Param_Cell, Param_String, Param_Cell);
 	
 	return APLRes_Success;
 }
@@ -267,8 +270,24 @@ public Action:OnPostWeaponEquip(client, weapon)
 	
 	if(!GetTrieValue(trie_weapons[client], classname, model_index) || model_index == -1) return;
 	
-	
 	Entity_SetGlobalName(weapon, "custom%i;%s", model_index,model_drop);
+	
+	char skin[64];
+	Format(skin, 64, "%s_skin", classname);
+	
+	int value = -1;
+	
+	if(!GetTrieValue(trie_weapons[client], skin, value) || value == -1) return;
+
+	
+	SetEntProp(weapon, Prop_Send, "m_nSkin", value);
+	
+	int viewModel = GetEntPropEnt(client, Prop_Send, "m_hViewModel");
+
+	if (viewModel == -1)
+		return;
+
+	SetEntProp(viewModel, Prop_Send, "m_nSkin", value);
 }
 
 public void OnClientPutInServer(int client)
@@ -449,6 +468,32 @@ public Native_AddDropWeapon(Handle:plugin, argc)
 	Call_Finish();
 }
 
+public Native_AddSkinWeapon(Handle:plugin, argc)
+{  
+	char name[64];
+	
+	int client = GetNativeCell(1);
+	GetNativeString(2, name, 64);
+	
+	int model_skin = GetNativeCell(3);
+	
+	char skin[64];
+	Format(skin, 64, "%s_skin", name);
+	
+	if(trie_weapons[client] == INVALID_HANDLE)
+		trie_weapons[client] = CreateTrie();
+	
+	SetTrieValue(trie_weapons[client], skin, model_skin);
+	
+	RefreshWeapon(client, name);
+	
+	Call_StartForward(OnClientSkin);
+	Call_PushCell(client);
+	Call_PushString(name);
+	Call_PushCell(model_skin);
+	Call_Finish();
+}
+
 public int Native_GetWeaponView(Handle:plugin, argc)
 {  
 	char name[64];
@@ -510,7 +555,7 @@ public void Native_GetWeaponDrop(Handle:plugin, argc)
 
 public Native_SetWeapon(Handle:plugin, argc)
 {  
-	char name[64], world[64], drop[64];
+	char name[64], world[64], drop[64], skin[64];
 	
 	int client = GetNativeCell(1);
 	GetNativeString(2, name, 64);
@@ -518,8 +563,10 @@ public Native_SetWeapon(Handle:plugin, argc)
 	int model_world = GetNativeCell(4);
 	char model_drop[128];
 	GetNativeString(5, model_drop, 128);
+	int model_skin = GetNativeCell(6);
 	Format(world, 64, "%s_world", name);
 	Format(drop, 64, "%s_drop", name);
+	Format(skin, 64, "%s_skin", name);
 	
 	if(trie_weapons[client] == INVALID_HANDLE)
 		trie_weapons[client] = CreateTrie();
@@ -527,6 +574,7 @@ public Native_SetWeapon(Handle:plugin, argc)
 	SetTrieValue(trie_weapons[client], name, model_index);
 	SetTrieValue(trie_weapons[client], world, model_world);
 	SetTrieString(trie_weapons[client], drop, model_drop);
+	SetTrieValue(trie_weapons[client], skin, model_skin);
 	
 	RefreshWeapon(client, name);
 	
@@ -546,6 +594,12 @@ public Native_SetWeapon(Handle:plugin, argc)
 	Call_PushCell(client);
 	Call_PushString(name);
 	Call_PushString(model_drop);
+	Call_Finish();
+	
+	Call_StartForward(OnClientSkin);
+	Call_PushCell(client);
+	Call_PushString(name);
+	Call_PushCell(model_skin);
 	Call_Finish();
 }
 
@@ -606,6 +660,26 @@ public Native_RemoveDropWeapon(Handle:plugin, argc)
 	Call_PushCell(client);
 	Call_PushString(name);
 	Call_PushString("none");
+	Call_Finish();
+}
+
+public Native_RemoveSkin(Handle:plugin, argc)
+{  
+	char name[64], skin[64];
+	
+	int client = GetNativeCell(1);
+	GetNativeString(2, name, 64);
+	
+	Format(skin, 64, "%s_skin", name);
+	if(trie_weapons[client] != INVALID_HANDLE)
+		SetTrieValue(trie_weapons[client], skin, 0);
+	
+	RefreshWeapon(client, name);
+	
+	Call_StartForward(OnClientSkin);
+	Call_PushCell(client);
+	Call_PushString(name);
+	Call_PushCell(0);
 	Call_Finish();
 }
 

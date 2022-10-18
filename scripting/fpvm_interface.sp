@@ -21,7 +21,7 @@
 #include <smlib>
 
 
-#define DATA "3.2"
+#define DATA "3.3"
 
 Handle trie_weapons[MAXPLAYERS+1];
 
